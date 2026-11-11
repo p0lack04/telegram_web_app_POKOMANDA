@@ -1,0 +1,536 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+enum Role {
+ ADMIN
+ LEAD
+ TRAINEE
+}
+enum AccountStatus {
+ PENDING
+ CONFIRMED
+ REJECTED
+}
+enum Visibility {
+ ADMIN_ONLY
+ ADMIN_LEAD
+ ADMIN_LEAD_TRAINEE
+}
+enum ShiftStage {
+ STAGE_1
+ STAGE_2
+ STAGE_3
+ STAGE_4
+}
+enum ApplicationType {
+ LEAD_RECRUIT
+ TRAINEE_RECRUIT
+}
+enum ApplicationStatus {
+ PENDING
+ APPROVED
+ REJECTED
+}
+enum MemberType {
+ LEAD
+ TRAINEE
+ CHILD
+}
+enum PaymentStatus {
+ UNPAID
+ PARTIAL
+ PAID
+}
+enum DailyMarkType {
+ FULL_DAY
+ TECHNIC
+}
+enum BankCategory {
+ FIVE_MIN
+ ICEBREAKER
+ EDUCATIONAL
+ ENTERTAINMENT
+}
+enum FileCategory {
+ DOCUMENT
+ MEDIA
+}
+enum ProgramType {
+ EDUCATIONAL
+ ENTERTAINMENT
+}
+enum TechPriority {
+ LOW
+ NORMAL
+ HIGH
+ URGENT
+}
+enum TechStatus {
+ PENDING
+ ASSIGNED
+ IN_PROGRESS
+ DONE
+ CANCELLED
+}
+enum SurveyType {
+ DAILY
+ GENERAL
+}
+enum SurveyAudience {
+ LEADS
+ TRAINEES
+ ALL
+}
+enum QuestionType {
+ TEXT
+ CHOICE
+ MULTIPLE_CHOICE
+ RATING
+ SCALE
+}
+model User {
+ id String @id @default(cuid())
+ telegramId BigInt @unique
+ username String?
+ firstName String
+ lastName String?
+ middleName String?
+ phone String?
+ birthDate DateTime? @db.Date
+ role Role @default(TRAINEE)
+ firstShiftDate DateTime? @db.Date
+ isOnboarded Boolean @default(false)
+ accountStatus AccountStatus @default(PENDING)
+ creativeTaskUrl String?
+ presentationUrl String?
+ manualShiftsCount Int @default(0)
+ manualExperience String?
+ confirmedById String?
+ confirmedAt DateTime?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ confirmer User? @relation("Confirmations",fields:[confirmedById],references:[id],onDelete:SetNull)
+ confirmations User[] @relation("Confirmations")
+ sessions Session[]
+ applications Application[]
+ shiftRoles ShiftRole[]
+ members SquadMember[]
+ dailyMarks DailyMark[]
+ bankEvents BankEvent[]
+ files BankEventFile[]
+ programItems ProgramItem[]
+ techCreated TechRequest[] @relation("TechCreator")
+ techAssigned TechRequest[] @relation("TechAssigner")
+ techResponsible TechRequest[] @relation("TechResponsible")
+ surveys Survey[]
+ submissions SurveySubmission[]
+ documents UserDocument[]
+ commentsReceived TraineeComment[] @relation("CommentTarget")
+ commentsAuthored TraineeComment[] @relation("CommentAuthor")
+ selectionReceived SelectionComment[] @relation("SelectionTarget")
+ selectionAuthored SelectionComment[] @relation("SelectionAuthor")
+ knowledge Knowledge[]
+ proposals ProgramProposal[]
+ notifications Notification[]
+ outbox Outbox[]
+ audits AuditLog[]
+ imports ImportJob[]
+ preferences NotificationPreference?
+ @@index([accountStatus,isOnboarded,createdAt])
+}
+model Session {
+ id String @id @default(cuid())
+ tokenHash String @unique
+ userId String
+ expiresAt DateTime
+ createdAt DateTime @default(now())
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ @@index([userId])
+ @@index([expiresAt])
+}
+model TelegramReplay {
+ digest String @id
+ expiresAt DateTime
+ @@index([expiresAt])
+}
+model Shift {
+ id String @id @default(cuid())
+ title String
+ description String?
+ startDate DateTime @db.Date
+ endDate DateTime @db.Date
+ timeZone String @default("Europe/Moscow")
+ visibility Visibility @default(ADMIN_ONLY)
+ stage ShiftStage @default(STAGE_1)
+ googleSheetId String?
+ leadRecruitOpen Boolean @default(false)
+ traineeRecruitOpen Boolean @default(false)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ applications Application[]
+ roles ShiftRole[]
+ squads Squad[]
+ program ProgramItem[]
+ techRequests TechRequest[]
+ surveys Survey[]
+ selectionComments SelectionComment[]
+ proposals ProgramProposal[]
+ audits AuditLog[]
+ imports ImportJob[]
+ @@index([visibility,startDate])
+}
+model Application {
+ id String @id @default(cuid())
+ shiftId String
+ userId String
+ type ApplicationType
+ status ApplicationStatus @default(PENDING)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ @@unique([shiftId,userId,type])
+ @@index([userId])
+ @@index([shiftId,type,status])
+}
+model Squad {
+ id String @id @default(cuid())
+ shiftId String
+ name String
+ color String @default("#28634a")
+ sortOrder Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ members SquadMember[]
+ roles ShiftRole[]
+ @@unique([id,shiftId])
+ @@unique([shiftId,name])
+}
+model SquadMember {
+ id String @id @default(cuid())
+ squadId String
+ shiftId String
+ userId String?
+ firstName String
+ lastName String
+ middleName String?
+ birthDate DateTime? @db.Date
+ memberType MemberType
+ building String?
+ room String?
+ paymentStatus PaymentStatus @default(UNPAID)
+ paymentNote String?
+ checkinStatus Boolean @default(false)
+ sortOrder Int @default(0)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ squad Squad @relation(fields:[squadId,shiftId],references:[id,shiftId],onDelete:Restrict)
+ user User? @relation(fields:[userId],references:[id],onDelete:Restrict)
+ dailyMarks DailyMark[]
+ @@unique([squadId,userId])
+ @@index([shiftId,memberType])
+ @@index([userId])
+}
+model ShiftRole {
+ id String @id @default(cuid())
+ shiftId String
+ userId String
+ position String
+ squadId String?
+ createdAt DateTime @default(now())
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ squad Squad? @relation(fields:[squadId,shiftId],references:[id,shiftId],onDelete:Restrict)
+ @@unique([shiftId,userId,position])
+ @@index([userId])
+ @@index([squadId,shiftId])
+}
+model DailyMark {
+ id String @id @default(cuid())
+ squadMemberId String
+ date DateTime @db.Date
+ markType DailyMarkType
+ note String?
+ setById String
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ member SquadMember @relation(fields:[squadMemberId],references:[id],onDelete:Restrict)
+ setter User @relation(fields:[setById],references:[id],onDelete:Restrict)
+ @@unique([squadMemberId,date])
+ @@index([setById])
+}
+model BankEvent {
+ id String @id @default(cuid())
+ authorId String
+ title String
+ description String?
+ category BankCategory
+ ageGroup String?
+ duration Int?
+ materials String?
+ tags String[]
+ isPublic Boolean @default(true)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ files BankEventFile[]
+ programItems ProgramItem[]
+ @@index([category,isPublic,createdAt])
+ @@index([authorId])
+}
+model BankEventFile {
+ id String @id @default(cuid())
+ bankEventId String
+ uploadedById String
+ fileName String
+ storageKey String @unique
+ checksum String
+ fileType FileCategory
+ mimeType String
+ fileSize Int
+ scanStatus String @default("PENDING")
+ createdAt DateTime @default(now())
+ bankEvent BankEvent @relation(fields:[bankEventId],references:[id],onDelete:Restrict)
+ uploader User @relation(fields:[uploadedById],references:[id],onDelete:Restrict)
+ @@index([bankEventId])
+ @@index([uploadedById])
+}
+model ProgramItem {
+ id String @id @default(cuid())
+ shiftId String
+ title String
+ description String?
+ date DateTime @db.Date
+ startTime String
+ endTime String
+ location String?
+ type ProgramType
+ responsibleId String?
+ bankEventId String?
+ sortOrder Int @default(0)
+ isLocked Boolean @default(false)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ responsible User? @relation(fields:[responsibleId],references:[id],onDelete:Restrict)
+ bankEvent BankEvent? @relation(fields:[bankEventId],references:[id],onDelete:Restrict)
+ techRequest TechRequest?
+ @@unique([id,shiftId])
+ @@index([shiftId,date,sortOrder])
+ @@index([responsibleId])
+ @@index([bankEventId])
+}
+model TechRequest {
+ id String @id @default(cuid())
+ shiftId String
+ programItemId String? @unique
+ authorId String
+ description String
+ priority TechPriority @default(NORMAL)
+ status TechStatus @default(PENDING)
+ responsibleId String?
+ assignedById String?
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ programItem ProgramItem? @relation(fields:[programItemId,shiftId],references:[id,shiftId],onDelete:Restrict)
+ author User @relation("TechCreator",fields:[authorId],references:[id],onDelete:Restrict)
+ responsible User? @relation("TechResponsible",fields:[responsibleId],references:[id],onDelete:Restrict)
+ assigner User? @relation("TechAssigner",fields:[assignedById],references:[id],onDelete:Restrict)
+ @@unique([programItemId,shiftId])
+ @@index([shiftId,status,priority])
+ @@index([responsibleId])
+ @@index([authorId])
+ @@index([assignedById])
+}
+model Survey {
+ id String @id @default(cuid())
+ shiftId String
+ title String
+ description String?
+ surveyType SurveyType
+ targetDate DateTime? @db.Date
+ audience SurveyAudience
+ isActive Boolean @default(false)
+ createdById String
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ creator User @relation(fields:[createdById],references:[id],onDelete:Restrict)
+ questions SurveyQuestion[]
+ submissions SurveySubmission[]
+ @@index([shiftId,isActive])
+ @@index([createdById])
+}
+model SurveyQuestion {
+ id String @id @default(cuid())
+ surveyId String
+ questionText String
+ questionType QuestionType
+ options String[]
+ sortOrder Int @default(0)
+ isRequired Boolean @default(true)
+ survey Survey @relation(fields:[surveyId],references:[id],onDelete:Restrict)
+ answers SurveyAnswer[]
+ @@unique([id,surveyId])
+ @@unique([surveyId,sortOrder])
+}
+model SurveySubmission {
+ id String @id @default(cuid())
+ surveyId String
+ userId String
+ createdAt DateTime @default(now())
+ survey Survey @relation(fields:[surveyId],references:[id],onDelete:Restrict)
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ answers SurveyAnswer[]
+ @@unique([surveyId,userId])
+ @@unique([id,surveyId])
+ @@index([userId])
+}
+model SurveyAnswer {
+ id String @id @default(cuid())
+ surveyId String
+ questionId String
+ submissionId String
+ answerText String?
+ answerValue Int?
+ answerOptions String[]
+ question SurveyQuestion @relation(fields:[questionId,surveyId],references:[id,surveyId],onDelete:Restrict)
+ submission SurveySubmission @relation(fields:[submissionId,surveyId],references:[id,surveyId],onDelete:Restrict)
+ @@unique([submissionId,questionId])
+ @@index([questionId,surveyId])
+}
+model UserDocument {
+ id String @id @default(cuid())
+ userId String
+ name String
+ issueDate DateTime? @db.Date
+ expiryDate DateTime? @db.Date
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ @@index([userId])
+ @@index([expiryDate])
+}
+model TraineeComment {
+ id String @id @default(cuid())
+ traineeId String
+ authorId String
+ text String
+ createdAt DateTime @default(now())
+ trainee User @relation("CommentTarget",fields:[traineeId],references:[id],onDelete:Restrict)
+ author User @relation("CommentAuthor",fields:[authorId],references:[id],onDelete:Restrict)
+ @@index([traineeId,createdAt])
+ @@index([authorId])
+}
+model SelectionComment {
+ id String @id @default(cuid())
+ shiftId String
+ candidateId String
+ authorId String
+ text String
+ createdAt DateTime @default(now())
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ candidate User @relation("SelectionTarget",fields:[candidateId],references:[id],onDelete:Restrict)
+ author User @relation("SelectionAuthor",fields:[authorId],references:[id],onDelete:Restrict)
+ @@index([shiftId,candidateId,createdAt])
+ @@index([authorId])
+}
+model Knowledge {
+ id String @id @default(cuid())
+ title String
+ category BankCategory?
+ kind String @default("METHODICAL")
+ text String
+ authorId String
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ @@index([category])
+ @@index([authorId])
+}
+model ProgramProposal {
+ id String @id @default(cuid())
+ shiftId String
+ authorId String
+ text String
+ status String @default("PENDING")
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ author User @relation(fields:[authorId],references:[id],onDelete:Restrict)
+ @@index([shiftId,status])
+ @@index([authorId])
+}
+model Notification {
+ id String @id @default(cuid())
+ userId String
+ kind String
+ text String
+ readAt DateTime?
+ createdAt DateTime @default(now())
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ @@index([userId,createdAt])
+}
+model Outbox {
+ id String @id @default(cuid())
+ userId String
+ dedupeKey String @unique
+ payload Json
+ attempts Int @default(0)
+ availableAt DateTime @default(now())
+ sentAt DateTime?
+ lockedAt DateTime?
+ lastErrorCode String?
+ createdAt DateTime @default(now())
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ @@index([sentAt,availableAt])
+ @@index([userId])
+}
+model NotificationPreference {
+ userId String @id
+ telegramOptIn Boolean @default(false)
+ programAlerts Boolean @default(true)
+ surveyAlerts Boolean @default(true)
+ techAlerts Boolean @default(true)
+ newShiftAlerts Boolean @default(true)
+ leadDocAlerts Boolean @default(true)
+ updatedAt DateTime @updatedAt
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+}
+model AuditLog {
+ id String @id @default(cuid())
+ actorId String
+ shiftId String?
+ action String
+ entityType String
+ entityId String
+ details Json?
+ createdAt DateTime @default(now())
+ actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ shift Shift? @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ @@index([entityType,entityId,createdAt])
+ @@index([shiftId,createdAt])
+ @@index([actorId])
+}
+model ImportJob {
+ id String @id @default(cuid())
+ shiftId String
+ actorId String
+ sourceHash String
+ kind String
+ status String @default("PREVIEW")
+ preview Json
+ expiresAt DateTime
+ committedAt DateTime?
+ createdAt DateTime @default(now())
+ shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ actor User @relation(fields:[actorId],references:[id],onDelete:Restrict)
+ @@index([actorId,expiresAt])
+ @@index([shiftId])
+}

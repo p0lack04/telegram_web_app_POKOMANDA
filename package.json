@@ -1,0 +1,34 @@
+{
+  "name": "komanda",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev:api": "npm run dev -w backend",
+    "dev:web": "npm run dev -w frontend",
+    "generate": "npm run generate -w backend",
+    "typecheck": "npm run typecheck --workspaces",
+    "lint": "eslint backend/src backend/test frontend/src",
+    "test": "npm run test --workspaces",
+    "test:browser": "npm run build && node scripts/browser-smoke.mjs",
+    "build": "npm run build --workspaces",
+    "db:validate": "npm run db:validate -w backend",
+    "db:deploy": "npm run db:deploy -w backend"
+  },
+  "overrides": {
+    "effect": "^3.22.4",
+    "deepmerge-ts": "^8.0.2",
+    "minimatch": "^11.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.65.0",
+    "eslint": "^9.39.0",
+    "globals": "^16.5.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0"
+  }
+}
