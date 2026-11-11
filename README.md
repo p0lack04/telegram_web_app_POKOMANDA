@@ -103,4 +103,3 @@ NODE_ENV=development ADMIN_TELEGRAM_ID=<ваш_числовой_Telegram_ID> npm
 - [ADR и этапы](docs/architecture/DECISIONS.md)
 - [Отчёт этапа 1](docs/PHASE-1-REPORT.md)
 
-Коммиты, push и deployment автоматически не выполняются.
