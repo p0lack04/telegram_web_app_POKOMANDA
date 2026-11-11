@@ -9,6 +9,13 @@ Prisma schema: `backend/prisma/schema.prisma`; PostgreSQL. Foundation migration 
 - AuditLog: actor/action/entity/shift/details; не писать контакты, текст частных комментариев или Telegram secrets в details.
 - Notification: собственный in-app inbox. Outbox/Preference существуют только как схема, Telegram delivery worker отсутствует.
 
+## Применённая реализация этапа 2
+
+- `202611110002_staffing`: non-null Application.version default 0 + CHECK version>=0; индексы userId/createdAt для заявок и ролей, shiftId/action/createdAt для audit.
+- `202611110003_notification_scope`: nullable Notification.shiftId, FK Shift (RESTRICT), индекс. Inbox и mark-read соединяют с текущей visibility; legacy STAFFING без связи не выдаются (строки не удалены, автоматического backfill из текста нет).
+- Проверено применение всех миграций на чистой временной PostgreSQL и foundation→002→003 с ранее созданными User/Shift/Application. Production БД не изменялась. Перед применением на постоянной БД — backup и `npm run db:deploy`; разрушительных операций нет.
+- Scoped mutation создаёт AuditLog и Notification в той же транзакции; параллельные заявки/решения проверены реальными HTTP-тестами.
+
 ## Миграционная стратегия
 Аддитивные изменения отдельной миграцией. Application.version — optimistic concurrency для решений; история решений/назначений — AuditLog с subjectUserId в безопасных details. Новые индексы под собственные заявки/назначения и историю. Старые данные сохраняются, никаких TRUNCATE/reset/db push. Проверки: migrate deploy на чистую PostgreSQL + replay foundation→следующая миграция на данных foundation, сохранение строк и уникальности.
 
