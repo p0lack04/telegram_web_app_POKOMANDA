@@ -27,3 +27,9 @@ export const shiftSchema = z.object({
 }).strict().refine(v=>v.endDate>=v.startDate,'Окончание не может быть раньше начала');
 export const pagination = z.object({page:z.coerce.number().int().min(1).max(10000).default(1),pageSize:z.coerce.number().int().min(1).max(100).default(20)}).strict();
 export const idParam = z.object({id:z.string().min(1).max(100)}).strict();
+export const applicationCreateSchema = z.object({type:z.enum(['LEAD_RECRUIT','TRAINEE_RECRUIT'])}).strict();
+export const applicationDecisionSchema = z.object({status:z.enum(['APPROVED','REJECTED']),version:z.number().int().min(0)}).strict();
+export const recruitmentSchema = z.object({leadRecruitOpen:z.boolean().optional(),traineeRecruitOpen:z.boolean().optional(),stage:z.enum(['STAGE_1','STAGE_2','STAGE_3','STAGE_4']).optional()}).strict().refine(v=>Object.keys(v).length>0,'Укажите хотя бы одно изменение');
+export const positionSchema = z.object({userId:z.string().min(1).max(100),position:z.string().trim().min(1).max(120),squadId:z.string().min(1).max(100).nullable().optional()}).strict();
+export const searchQuery = pagination.extend({search:z.string().trim().max(100).default('')}).strict();
+export const notificationIdParam = z.object({id:z.string().min(1).max(100)}).strict();

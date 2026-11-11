@@ -189,12 +189,14 @@ model Application {
  userId String
  type ApplicationType
  status ApplicationStatus @default(PENDING)
+ version Int @default(0)
  createdAt DateTime @default(now())
  updatedAt DateTime @updatedAt
  shift Shift @relation(fields:[shiftId],references:[id],onDelete:Restrict)
  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
  @@unique([shiftId,userId,type])
  @@index([userId])
+ @@index([userId,createdAt])
  @@index([shiftId,type,status])
 }
 model Squad {
@@ -247,6 +249,7 @@ model ShiftRole {
  user User @relation(fields:[userId],references:[id],onDelete:Restrict)
  squad Squad? @relation(fields:[squadId,shiftId],references:[id,shiftId],onDelete:Restrict)
  @@unique([shiftId,userId,position])
+ @@index([userId,createdAt])
  @@index([userId])
  @@index([squadId,shiftId])
 }
@@ -516,6 +519,7 @@ model AuditLog {
  shift Shift? @relation(fields:[shiftId],references:[id],onDelete:Restrict)
  @@index([entityType,entityId,createdAt])
  @@index([shiftId,createdAt])
+ @@index([shiftId,action,createdAt])
  @@index([actorId])
 }
 model ImportJob {
