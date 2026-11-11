@@ -181,6 +181,7 @@ model Shift {
  proposals ProgramProposal[]
  audits AuditLog[]
  imports ImportJob[]
+ notifications Notification[]
  @@index([visibility,startDate])
 }
 model Application {
@@ -473,11 +474,14 @@ model ProgramProposal {
 model Notification {
  id String @id @default(cuid())
  userId String
+ shiftId String?
  kind String
  text String
  readAt DateTime?
  createdAt DateTime @default(now())
  user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ shift Shift? @relation(fields:[shiftId],references:[id],onDelete:Restrict)
+ @@index([shiftId])
  @@index([userId,createdAt])
 }
 model Outbox {

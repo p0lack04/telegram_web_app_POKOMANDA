@@ -82,5 +82,30 @@ describe('staffing HTTP + PostgreSQL',()=>{
  it('снятие назначения scoped и аудит сохраняется после удаления',async()=>{const role=await db.shiftRole.findFirstOrThrow({where:{userId:lead.id,position:'Медиа-группа'}});expect((await remove(other,`/api/shifts/${shiftId}/roles/${role.id}`)).statusCode).toBe(403);expect((await remove(admin,`/api/shifts/${hiddenId}/roles/${role.id}`)).statusCode).toBe(404);expect((await remove(admin,`/api/shifts/${shiftId}/roles/${role.id}`)).statusCode).toBe(204);expect(await db.auditLog.count({where:{entityId:role.id,action:'POSITION_REMOVED'}})).toBe(1);});
  it('история staff ограничена своим subject, заместитель не читает решения по анкетам',async()=>{const own=(await get(trainee,`/api/shifts/${shiftId}/staffing-history`)).json();expect(own.total).toBe(2);expect(own.items.every((v:{details:{subjectUserId:string}})=>v.details.subjectUserId===trainee.id)).toBe(true);const manager=(await get(deputy,`/api/shifts/${shiftId}/staffing-history`)).json();expect(manager.items.every((v:{action:string})=>v.action.startsWith('POSITION_'))).toBe(true);});
  it('уведомление прочитать может только получатель',async()=>{const inbox=(await get(trainee,'/api/me/notifications')).json();expect(inbox.total).toBe(1);const id=inbox.items[0].id;expect((await post(lead,`/api/me/notifications/${id}/read`,{})).statusCode).toBe(404);expect((await post(trainee,`/api/me/notifications/${id}/read`,{})).json().notification.readAt).toBeTruthy();});
+ it('уведомления соблюдают текущую видимость в inbox и mark-read',async()=>{
+  const s=await db.shift.create({data:{title:'Временный доступ',startDate:new Date('2027-02-01'),endDate:new Date('2027-02-10'),visibility:'ADMIN_LEAD_TRAINEE'}});
+  const notification=await db.notification.create({data:{userId:other.id,shiftId:s.id,kind:'STAFFING',text:'Секрет смены'}});
+  await db.shift.update({where:{id:s.id},data:{visibility:'ADMIN_ONLY'}});
+  const inbox=await get(other,'/api/me/notifications');expect(inbox.body).not.toContain('Секрет смены');expect(inbox.json().items.map((n:{id:string})=>n.id)).not.toContain(notification.id);
+  expect((await post(other,`/api/me/notifications/${notification.id}/read`,{})).statusCode).toBe(404);
+ });
+ it('новое решение по скрытой смене не раскрывается уведомлением',async()=>{
+  const s=await db.shift.create({data:{title:'Не раскрывать название',startDate:new Date('2027-02-01'),endDate:new Date('2027-02-10'),visibility:'ADMIN_LEAD_TRAINEE'}});
+  const a=await db.application.create({data:{shiftId:s.id,userId:other.id,type:'TRAINEE_RECRUIT'}});
+  await db.shift.update({where:{id:s.id},data:{visibility:'ADMIN_ONLY'}});
+  expect((await patch(admin,`/api/applications/${a.id}`,{status:'REJECTED',version:0})).statusCode).toBe(200);
+  const n=await db.notification.findFirstOrThrow({where:{userId:other.id,shiftId:s.id}});
+  expect((await get(other,'/api/me/notifications')).body).not.toContain('Не раскрывать название');expect((await post(other,`/api/me/notifications/${n.id}/read`,{})).statusCode).toBe(404);
+ });
+ it('после смены глобальной роли notification scope применяется к действующей сессии',async()=>{
+  const user=await fixture(207,'LEAD');const s=await db.shift.create({data:{title:'Для ведущих',startDate:new Date('2027-02-01'),endDate:new Date('2027-02-10'),visibility:'ADMIN_LEAD'}});
+  const n=await db.notification.create({data:{userId:user.id,shiftId:s.id,kind:'STAFFING',text:'Только ведущим'}});
+  expect((await get(user,'/api/me/notifications')).json().total).toBe(1);await db.user.update({where:{id:user.id},data:{role:'TRAINEE'}});
+  expect((await get(user,'/api/me/notifications')).json().total).toBe(0);expect((await post(user,`/api/me/notifications/${n.id}/read`,{})).statusCode).toBe(404);
+ });
+ it('legacy STAFFING без связи не выдаётся, общие уведомления сохранены',async()=>{
+  const legacy=await db.notification.create({data:{userId:other.id,kind:'STAFFING',text:'Legacy secret'}});await db.notification.create({data:{userId:other.id,kind:'ACCOUNT',text:'Общее уведомление'}});
+  const inbox=await get(other,'/api/me/notifications');expect(inbox.body).not.toContain('Legacy secret');expect(inbox.body).toContain('Общее уведомление');expect((await post(other,`/api/me/notifications/${legacy.id}/read`,{})).statusCode).toBe(404);
+ });
  it('blocked account или невидимая смена исчезают из own lists',async()=>{await db.shift.update({where:{id:shiftId},data:{visibility:'ADMIN_ONLY'}});expect((await get(lead,'/api/me/assignments')).json().total).toBe(0);expect((await get(trainee,'/api/me/applications')).json().total).toBe(0);expect((await get(deputy,`/api/shifts/${shiftId}/staffing-history`)).statusCode).toBe(404);await db.user.update({where:{id:lead.id},data:{accountStatus:'REJECTED'}});expect((await get(lead,'/api/me/assignments')).statusCode).toBe(403);});
 });

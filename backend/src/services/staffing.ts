@@ -31,7 +31,7 @@ export class StaffingService {
  }
  private async record(tx:Tx,actor:User,shift:Shift,action:string,entityType:string,entityId:string,details:Prisma.InputJsonObject,recipientId?:string,text?:string) {
   await tx.auditLog.create({data:{actorId:actor.id,shiftId:shift.id,action,entityType,entityId,details}});
-  if(recipientId&&text) await tx.notification.create({data:{userId:recipientId,kind:'STAFFING',text}});
+  if(recipientId&&text) await tx.notification.create({data:{userId:recipientId,shiftId:shift.id,kind:'STAFFING',text}});
  }
  async metadata(actorId:string,shiftId:string) {
   return this.db.$transaction(async tx=>{
@@ -146,10 +146,13 @@ export class StaffingService {
    return {items:await tx.auditLog.findMany({where,select:{id:true,action:true,entityType:true,entityId:true,createdAt:true,details:true,actor:{select:{id:true,firstName:true,lastName:true,middleName:true}}},orderBy:[{createdAt:'desc'},{id:'asc'}],skip:(page-1)*pageSize,take:pageSize}),total:await tx.auditLog.count({where}),page,pageSize};
   });
  }
+ private notificationWhere(actor:User):Prisma.NotificationWhereInput {
+  return {userId:actor.id,OR:[{shift:{is:visibleShiftWhere(actor)}},{shiftId:null,kind:{not:'STAFFING'}}]};
+ }
  async notifications(actorId:string,page:number,pageSize:number) {
-  return this.db.$transaction(async tx=>{await this.actor(tx,actorId);const where={userId:actorId};return {items:await tx.notification.findMany({where,orderBy:[{createdAt:'desc'},{id:'asc'}],take:pageSize,skip:(page-1)*pageSize}),total:await tx.notification.count({where}),page,pageSize};});
+  return this.db.$transaction(async tx=>{const actor=await this.actor(tx,actorId);const where=this.notificationWhere(actor);return {items:await tx.notification.findMany({where,orderBy:[{createdAt:'desc'},{id:'asc'}],take:pageSize,skip:(page-1)*pageSize}),total:await tx.notification.count({where}),page,pageSize};});
  }
  async readNotification(actorId:string,id:string) {
-  return this.db.$transaction(async tx=>{await this.actor(tx,actorId);const notification=await tx.notification.findFirst({where:{id,userId:actorId}});requireRule(notification,404,'NOT_FOUND','Уведомление не найдено');return {notification:await tx.notification.update({where:{id},data:{readAt:notification.readAt??new Date()}})};});
+  return this.db.$transaction(async tx=>{const actor=await this.actor(tx,actorId);const notification=await tx.notification.findFirst({where:{id,...this.notificationWhere(actor)}});requireRule(notification,404,'NOT_FOUND','Уведомление не найдено');return {notification:await tx.notification.update({where:{id},data:{readAt:notification.readAt??new Date()}})};});
  }
 }
