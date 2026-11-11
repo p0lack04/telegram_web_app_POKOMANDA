@@ -6,10 +6,24 @@
 - Существующие FEATURE-MATRIX и DECISIONS перенесены в FEATURE_MATRIX и ARCHITECTURE без дублирования; созданы context/database/permissions и этот журнал.
 - Git workflow уже существует, прочитан; используется logical commit + push, без merge/force.
 - GitHub CLI отсутствует в PATH; создание PR требует подготовить CLI и проверить авторизацию.
-- Исходные TXT отсутствуют в актуальном дереве; прежний отчёт foundation остаётся историческим.
+- Уточнение: TXT отсутствуют только в Git tree, но локальные файлы 1.txt/2.txt/3.txt существуют в корне. Разделы заявок и матрицы должностей сверены с локальными 1.txt:305–342 и 2.txt:299–318; предыдущее предположение об отсутствии файлов на диске исправлено.
 
 ## Backend заявок и назначений
 - Добавлены StaffingService/domain policies/роуты: submission, own/all lists, decisions version-CAS, recruitment/stage, candidates/manual admission, roles, history, in-app inbox.
 - Аддитивная migration 202611110002_staffing: Application.version и индексы. Upgrade foundation с существующими User/Shift/Application проверен без потери данных.
 - Проверки: Prisma validate (с тестовым DATABASE_URL), generate, lint/typecheck/build PASS; backend 95 tests PASS. Первый прогон staffing-теста имел неверное ожидание 403 от уже назначенного руководителя, исправлена test identity, production-права не ослаблялись.
 - Новые production-сценарии ещё ожидают frontend/browser acceptance; backend commit не означает готовность всего этапа.
+
+## Исправление notification visibility
+- Review выявил утечку названия скрытой смены через STAFFING inbox/mark-read. Миграция 202611110003_notification_scope добавляет nullable FK к Shift и индекс, без удаления данных.
+- Scope проверяется при каждом чтении inbox и mark-read; legacy STAFFING без shiftId скрыты (надёжного backfill нет), общие ACCOUNT уведомления остаются доступны владельцу.
+- Четыре regression tests: скрытие после отправки, новое отклонение уже скрытой заявки, смена глобальной роли при действующей сессии, legacy orphan-scope.
+- Итог после исправления: 99 backend tests, 24 frontend tests, lint/typecheck/build/browser PASS.
+
+## UI и browser acceptance
+- Staffing.tsx подключён к деталям смены и профилю: подача, версии решений с подтверждением, набор/этап, manual admission, персонал/назначения, история/own inbox.
+- Frontend разработан в изолированном worktree; patch проверен и применён в основном локальном checkout. После интеграции исправлены запрос staff без permission, доступные имена select и подписи history. History DTO дополнен минимальным subject summary, без контактов.
+- Browser smoke использует настоящий API/PostgreSQL, синтетические сессии только в тестовой БД. Проверены apply/approve/reject/manual/assign/remove и deputy controls; screenshots просмотрены. Между независимыми группами теста перезапускается API для изоляции in-memory per-IP rate-limit store; production лимит не отключается.
+- Неудачные browser-прогоны: неоднозначная подпись select; отсутствующий goto для нового контекста; substring match «Руководитель» захватывал «Руководитель тех группы»; исчерпание общего test-IP rate limit. Причины исправлены, проверки не удалены.
+- Финал UI: lint/typecheck/build PASS, **99 backend + 25 frontend = 124 tests PASS**, browser PASS, npm audit **0 vulnerabilities**.
+- GitHub CLI portable подготовлен с разрешения пользователя. Существующий токен Git не имеет read:org для persistent gh login, но repo API работает через разрешённую передачу GH_TOKEN только в окружение дочернего CLI-процесса (без записи секрета в проект/лог).
