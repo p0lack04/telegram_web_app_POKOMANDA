@@ -1,9 +1,9 @@
 # Контекст проекта «Команда»
 
-Актуализировано: 2026-11-11, начало этапа 2.
+Актуализировано: 2026-11-11, этап 2 реализован в PR [#3](https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/3), merge выполняет пользователь. Проверки: 99 backend + 25 frontend tests, lint/typecheck/build/browser PASS, npm audit 0.
 
 ## Отправная точка
-Production Foundation объединён в main (PR #1). Перед этапом 2 main/origin/main = f084151; рабочее дерево чистое. Исходные TXT отсутствуют в текущем Git tree (удалены предыдущими коммитами); исторические требования сохранены в ADR и матрице. Не восстанавливать и не удалять файлы без задачи.
+Production Foundation объединён в main (PR #1). Перед этапом 2 main/origin/main = f084151; рабочее дерево чистое. Исходные TXT удалены из отслеживаемого Git tree предыдущими коммитами, но локальные `1.txt`, `2.txt`, `3.txt` в корне существуют и приоритетны как источник требований. Не изменять и не добавлять их обратно в Git без задачи.
 
 ## Стек и границы
 React18/TS/Vite/TanStack Query; Fastify5/Zod/PostgreSQL/Prisma6; Vitest + embedded PostgreSQL и Playwright. Один backend, один workspace lockfile. Auth/onboarding/session/shift visibility уже работают; не переписывать.

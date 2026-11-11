@@ -1,8 +1,8 @@
 # ПО «Команда» — Telegram Mini App
 
-**Статус: первая рабочая версия.**
+**Статус: Foundation и этап 2 «Заявки и распределение персонала» реализованы; весь продукт ещё не завершён.**
 
-Исходные TXT удалены предыдущими коммитами; требования отражены в постоянной документации. Демо не включено в production bundle. Сейчас реально работают Telegram auth/session, онбординг, подтверждение анкет, просмотр/создание смен с серверной видимостью, собственный профиль. Отряды, заявки, программа, банк, опросы и интеграции пока имеют модель данных/план, но не готовые API/экраны. Подробности: [матрица функций](docs/FEATURE_MATRIX.md).
+Исходные TXT исключены из отслеживаемого Git tree; локальные файлы в корне сохранены и используются для сверки требований. Демо не включено в production bundle. Сейчас работают Telegram auth/session, онбординг/подтверждение анкет, смены с серверной видимостью, заявки/решения, допуск сотрудников и назначение должностей, история и собственные in-app уведомления. Отряды, программа, банк, опросы и внешние интеграции пока не являются готовыми пользовательскими модулями. Подробности: [матрица функций](docs/FEATURE_MATRIX.md).
 
 ## Стек
 - React 18, TypeScript, Vite 8, TanStack Query.
@@ -77,6 +77,30 @@ NODE_ENV=development ADMIN_TELEGRAM_ID=<ваш_числовой_Telegram_ID> npm
 | GET | `/api/shifts?upcoming=true` | ближайшие, сортировка до пагинации |
 | GET | `/api/shifts/:id` | 404 на невидимую смену |
 | POST | `/api/shifts` | ADMIN, создание + audit |
+
+## Этап 2 — API и миграции
+
+Все списки поддерживают `page/pageSize` (максимум 100). DTO персонала: ID/ФИО/глобальная роль, без контактов/даты рождения/Telegram ID.
+
+| Метод | Путь | Доступ/назначение |
+|---|---|---|
+| GET | `/api/shifts/:id/staffing` | active + visible; server flags/catalog |
+| GET / POST | `/api/shifts/:id/applications` | ADMIN все / остальные свои; POST собственная заявка `{type}` |
+| PATCH | `/api/applications/:id` | ADMIN `{status: APPROVED/REJECTED, version}` |
+| GET | `/api/me/applications` | свои заявки с current visibility |
+| PATCH | `/api/shifts/:id/recruitment` | ADMIN flags/stage |
+| GET | `/api/shifts/:id/staff-candidates?search=...` | ADMIN, минимум 2 символа |
+| GET / POST | `/api/shifts/:id/staff` | менеджер читает; ADMIN добавляет `{userId}` |
+| GET / POST | `/api/shifts/:id/roles` | own/manager read; manager assign `{userId,position,squadId?}` |
+| DELETE | `/api/shifts/:id/roles/:roleId` | manager, руководителя только ADMIN |
+| GET | `/api/me/assignments` | собственные назначения |
+| GET | `/api/shifts/:id/staffing-history` | own / manager positions / ADMIN full |
+| GET | `/api/me/notifications` | свой inbox + актуальная visibility |
+| POST | `/api/me/notifications/:id/read` | только владелец, видимая смена |
+
+`202611110002_staffing`: Application.version default 0 + nonnegative CHECK, индексы заявок/ролей/истории. `202611110003_notification_scope`: nullable Notification.shiftId + FK/index. Обе миграции аддитивны, существующие строки не удаляются. Upgrade с данными foundation проверен integration test. Старые STAFFING-уведомления без shiftId сохраняются в БД, но скрыты API: надёжно восстановить связь из текста нельзя. После backup применяйте `npm run db:deploy`; не редактируйте уже применённую migration и не используйте reset.
+
+Заявку рассматривает ADMIN, участие и должность — разные сущности; повторное решение/подача закрытой заявки не реализуются. In-app notification не означает Telegram delivery. Реальный browser smoke проверяет apply/approve/reject/manual add/assign/remove/history/inbox/deputy controls на PostgreSQL; 124 unit/integration/frontend tests проходят.
 
 ## Безопасность и эксплуатационные границы
 - HMAC Telegram, TTL 5 минут, нечисловые/будущие даты/дубли ключей/неверная identity запрещены. Replay связывается с подписью, не с порядком параметров URL.
