@@ -143,7 +143,11 @@ export class StaffingService {
   return this.db.$transaction(async tx=>{
    const actor=await this.actor(tx,actorId);const shift=await this.shift(tx,actor,shiftId);const manage=await this.manager(tx,actor,shift);
    const where:Prisma.AuditLogWhereInput={shiftId,action:{in:[...staffingActions]},...(actor.role==='ADMIN'?{}:manage?{action:{in:['POSITION_ASSIGNED','POSITION_REMOVED']}}:{details:{path:['subjectUserId'],equals:actor.id}})};
-   return {items:await tx.auditLog.findMany({where,select:{id:true,action:true,entityType:true,entityId:true,createdAt:true,details:true,actor:{select:{id:true,firstName:true,lastName:true,middleName:true}}},orderBy:[{createdAt:'desc'},{id:'asc'}],skip:(page-1)*pageSize,take:pageSize}),total:await tx.auditLog.count({where}),page,pageSize};
+   const items=await tx.auditLog.findMany({where,select:{id:true,action:true,entityType:true,entityId:true,createdAt:true,details:true,actor:{select:{id:true,firstName:true,lastName:true,middleName:true}}},orderBy:[{createdAt:'desc'},{id:'asc'}],skip:(page-1)*pageSize,take:pageSize});
+   const subjectId=(details:Prisma.JsonValue)=>details&&typeof details==='object'&&!Array.isArray(details)&&typeof details.subjectUserId==='string'?details.subjectUserId:undefined;
+   const ids=items.map(item=>subjectId(item.details)).filter((id):id is string=>!!id);
+   const subjects=await tx.user.findMany({where:{id:{in:ids}},select:summary});
+   return {items:items.map(item=>({...item,subject:subjects.find(user=>user.id===subjectId(item.details))??null})),total:await tx.auditLog.count({where}),page,pageSize};
   });
  }
  private notificationWhere(actor:User):Prisma.NotificationWhereInput {
