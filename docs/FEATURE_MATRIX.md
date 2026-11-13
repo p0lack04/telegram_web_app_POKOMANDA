@@ -1,9 +1,17 @@
-# Матрица функций — 2026-11-11
+# Матрица функций — 2026-11-13
+
+## Этап 3 — read-only Squad (APPROVED решения D1/D2/D3/D14/D12)
+
+| Экран / действие | UI / источник | Persistence / API | Auth / scope | Тест | Статус |
+|---|---|---|---|---|---|
+| Список и карточка метаданных отряда | `frontend/src/Squads.tsx`, `ShiftDetail` | `GET /api/shifts/:id/squads`, `GET /api/shifts/:id/squads/:squadId`; Prisma schema без изменений | active + shift visibility; `squad.view_all` либо scoped `squad.view_own`; membership без permission не даёт доступ; скрытый detail 404 | backend integration, frontend, browser smoke | **готово этап 3, read-only** |
+| Количество, состав детей/сотрудников, Squad CRUD, DailyMark | будущие модули | не реализовано | отдельные object/field policies pending | нет | **схема / не входит в срез** |
 
 Статусы: **готово v1** = есть реальный UI → API → PostgreSQL, серверная auth/policy и тесты; **схема** = модель/решение заложены, use-case ещё не подключён; **прототип** = только `3.txt`, не production; **не начато**.
 
 | Экран / действие | UI / источник | Persistence / API | Auth / scope | Тест | Статус |
 |---|---|---|---|---|---|
+
 | Вход Telegram Mini App | `frontend/src/App.tsx`, `telegram.ts` | raw initData → `POST /api/auth/telegram`; Session + TelegramReplay | HMAC, TTL 5 мин, timing-safe, replay digest, HttpOnly cookie | `telegram-auth.test`, integration replay | **готово v1** |
 | Dev/browser fallback | гостевой экран | нет фиктивной identity | production не принимает ID/query; browser без Telegram остаётся гостем | browser smoke guest | **готово v1** |
 | `/me`, logout, session | App/API client | `/auth/me`, `/auth/logout`, Session hash | cookie, текущий User загружается сервером | integration/HTTP client | **готово v1** |
@@ -21,7 +29,7 @@
 | In-app staffing notifications | profile inbox | Notification.shiftId, visibility recheck, read endpoint | recipient-only + current shift visibility | regression + browser | **готово этап 2** |
 
 | RBAC object/field checks | central domain policy + staffing service | admission/roles/notifications scope | active + visible + action/target | negative integration tests | **готово staffing, остальное не внедрено** |
-| Squad CRUD / visibility | `3.txt` only | Squad/SquadMember schema composite shift FK | будущий view_all/view_own | не реализован | **схема** |
+| Squad CRUD / управление | `3.txt` only | Squad schema; mutations отсутствуют | management policy pending; read-only метаданные реализованы отдельно выше | не реализован | **схема** |
 | Child/ped staff membership | `3.txt` only | SquadMember + DB identity CHECK | child без User, staff с User | migration CHECK integration | **схема** |
 | Rooms/payment/checkin | `3.txt` only | SquadMember fields; PARTIAL note CHECK | field-level permissions planned | DB constraint integration | **схема** |
 | DailyMark | `3.txt` only | unique member+date | setter scope planned | не реализован | **схема** |

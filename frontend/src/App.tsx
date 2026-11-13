@@ -3,6 +3,7 @@ import {useQuery,useMutation,useQueryClient} from '@tanstack/react-query';
 import {api,ApiError} from './api';
 import {telegram,useTelegram} from './telegram';
 import Staffing,{OwnStaffing} from './Staffing';
+import {Squads,SquadDetail} from './Squads';
 import {type User,type Shift,type Page,roles,stages,visibility,dateLabel,fullName} from './types';
 
 const message=(error:unknown)=>error instanceof Error?error.message:'Не удалось выполнить действие';
@@ -24,9 +25,11 @@ export default function App(){
  const [route,setRoute]=useState<'home'|'shifts'|'profile'|'team'>('home');
  const [selected,setSelected]=useState<Shift|null>(null);
  const [creating,setCreating]=useState(false);
- const back=useCallback(()=>{setSelected(null);setCreating(false);},[]);
+ const [selectedSquad,setSelectedSquad]=useState<string|null>(null);
+ const back=useCallback(()=>{if(selectedSquad!==null){setSelectedSquad(null);return;}setSelected(null);setCreating(false);},[selectedSquad]);
+ const resetNavigation=()=>{setSelectedSquad(null);setSelected(null);setCreating(false);};
  useTelegram(selected||creating?back:undefined);
- const logout=useMutation({mutationFn:()=>api<void>('/auth/logout',{}),onSuccess:()=>{client.clear();client.setQueryData(['session'],null);setSelected(null);setRoute('home');}});
+ const logout=useMutation({mutationFn:()=>api<void>('/auth/logout',{}),onSuccess:()=>{client.clear();client.setQueryData(['session'],null);resetNavigation();setRoute('home');}});
  if(auth.isPending)return <main className="gate"><Brand/><Loading/></main>;
  if(auth.isError)return <main className="gate"><Brand/><h1>Вход в приложение</h1><Notice error={auth.error} retry={()=>void auth.refetch()}/><p className="muted">Если данные Telegram устарели, закройте мини-приложение и откройте его заново из бота.</p></main>;
  const user=auth.data;
@@ -36,15 +39,15 @@ export default function App(){
  if(user.accountStatus==='PENDING')return <main className="gate"><Brand/><p className="eyebrow">АНКЕТА ОТПРАВЛЕНА</p><h1>До встречи<br/>в команде.</h1><p className="muted">Руководитель проверит вашу анкету. Пока идёт проверка, данные смен и других участников недоступны.</p><StatusRefresh saved={setUser}/><button className="text-button" disabled={logout.isPending} onClick={()=>logout.mutate()}>Выйти</button>{logout.isError&&<Notice error={logout.error}/>}</main>;
  const title=selected?selected.title:creating?'Новая смена':{home:'Главная',shifts:'Смены',profile:'Профиль',team:'Проверка анкет'}[route];
  return <div className="shell"><header><Brand/><span className="role-pill">{roles[user.role]}</span></header><main>
-  {(selected||creating)&&<button className="text-button" onClick={back}>← К списку смен</button>}
+  {(selected||creating)&&<button className="text-button" onClick={back}>{selectedSquad!==null?'← К отрядам':'← К списку смен'}</button>}
   <div className="page-heading"><div><p className="eyebrow">ОТРЯД «КОМАНДА»</p><h1>{title}</h1></div>{route==='shifts'&&!selected&&!creating&&user.role==='ADMIN'&&<button onClick={()=>setCreating(true)}>+ Создать</button>}</div>
-  {selected?<ShiftDetail shift={selected} user={user}/>:creating?<CreateShift saved={shift=>{setCreating(false);setSelected(shift);void client.invalidateQueries({queryKey:['shifts']});}}/>:route==='home'?<>
+  {selected?<ShiftDetail shift={selected} user={user} openSquad={setSelectedSquad} squadId={selectedSquad}/>:creating?<CreateShift saved={shift=>{setCreating(false);setSelected(shift);void client.invalidateQueries({queryKey:['shifts']});}}/>:route==='home'?<>
    <section className="hero"><p>Рады видеть вас, {user.firstName}</p><h2>Одна команда.<br/>Много важных дел.</h2><p>Здесь начинается подготовка к вашей следующей смене.</p><button onClick={()=>setRoute('shifts')}>Перейти к сменам <span aria-hidden="true">↗</span></button></section>
    <div className="section-heading"><h2>Ближайшие смены</h2><button className="text-button" onClick={()=>setRoute('shifts')}>Все смены →</button></div><Shifts compact open={shift=>{setRoute('shifts');setSelected(shift);}}/>
    {user.role==='ADMIN'&&<button className="action-row" onClick={()=>setRoute('team')}><span><strong>Проверить новые анкеты</strong><small>Подтверждение участников отряда</small></span><span aria-hidden="true">→</span></button>}
    <p className="scope-note">Второй этап: заявки на смены, педсостав, должности и внутренние уведомления. Управление отрядами, программа, банк и опросы ещё не доступны в этой версии.</p>
   </>:route==='shifts'?<Shifts open={setSelected}/>:route==='team'&&user.role==='ADMIN'?<Team/>:<><section className="panel"><div className="avatar" aria-hidden="true">{user.firstName.slice(0,1)}</div><h2>{fullName(user)}</h2><p className="muted">{roles[user.role]} · Анкета подтверждена</p><dl><dt>Дата рождения</dt><dd>{user.birthDate?dateLabel(user.birthDate):'Не указана'}</dd><dt>Телефон</dt><dd>{user.phone||'Не указан'}</dd><dt>Указанный стаж</dt><dd>{user.manualExperience||'Не указан'}</dd><dt>Регистрация</dt><dd>{dateLabel(user.createdAt)}</dd></dl><button className="secondary" disabled={logout.isPending} onClick={()=>logout.mutate()}>{logout.isPending?'Выходим…':'Выйти из аккаунта'}</button>{logout.isError&&<Notice error={logout.error}/>}</section><OwnStaffing/></>}
- </main><nav className="tabbar" aria-label="Основная навигация">{([{key:'home',label:'Главная',icon:'⌂'},{key:'shifts',label:'Смены',icon:'▦'},...(user.role==='ADMIN'?[{key:'team' as const,label:'Анкеты',icon:'☷'}]:[]),{key:'profile',label:'Профиль',icon:'○'}] as const).map(tab=><button key={tab.key} aria-current={route===tab.key?'page':undefined} onClick={()=>{back();setRoute(tab.key);window.scrollTo(0,0);}}><span aria-hidden="true">{tab.icon}</span>{tab.label}</button>)}</nav></div>;
+ </main><nav className="tabbar" aria-label="Основная навигация">{([{key:'home',label:'Главная',icon:'⌂'},{key:'shifts',label:'Смены',icon:'▦'},...(user.role==='ADMIN'?[{key:'team' as const,label:'Анкеты',icon:'☷'}]:[]),{key:'profile',label:'Профиль',icon:'○'}] as const).map(tab=><button key={tab.key} aria-current={route===tab.key?'page':undefined} onClick={()=>{resetNavigation();setRoute(tab.key);window.scrollTo(0,0);}}><span aria-hidden="true">{tab.icon}</span>{tab.label}</button>)}</nav></div>;
 }
 function StatusRefresh({saved}:{saved:(user:User)=>void}){
  const refresh=useMutation({mutationFn:()=>api<{user:User}>('/auth/me'),onSuccess:data=>saved(data.user)});
@@ -77,10 +80,10 @@ function Shifts({open,compact=false}:{open:(shift:Shift)=>void;compact?:boolean}
  const list=compact?query.data.items.filter(shift=>shift.endDate.slice(0,10)>=new Date().toISOString().slice(0,10)):query.data.items;
  return <>{list.length?<div className="shift-list">{list.map(shift=><ShiftCard key={shift.id} shift={shift} open={()=>open(shift)}/>)}</div>:<div className="empty"><span aria-hidden="true">▦</span><h2>{compact?'Ближайших смен пока нет':'Доступных смен пока нет'}</h2><p>Когда руководитель откроет смену для вашей роли, она появится здесь.</p></div>}{!compact&&<div className="pagination"><button className="secondary" disabled={page===1} onClick={()=>setPage(page-1)}>Назад</button><span>Страница {page}</span><button className="secondary" disabled={page*20>=query.data.total} onClick={()=>setPage(page+1)}>Далее</button></div>}</>;
 }
-function ShiftDetail({shift,user}:{shift:Shift;user:User}){
+function ShiftDetail({shift,user,openSquad,squadId}:{shift:Shift;user:User;openSquad:(id:string)=>void;squadId:string|null}){
  const query=useQuery({queryKey:['shift',shift.id],queryFn:()=>api<{shift:Shift}>('/shifts/'+shift.id)});
  if(query.isPending)return <Loading/>;if(query.isError)return <Notice error={query.error} retry={()=>void query.refetch()}/>;
- const item=query.data.shift;return <><section className="panel"><span className="status">{stages[item.stage]}</span><h2>{item.title}</h2><p className="muted">{dateLabel(item.startDate)} — {dateLabel(item.endDate)}</p>{item.description&&<p className="multiline">{item.description}</p>}<dl><dt>Видимость</dt><dd>{visibility[item.visibility]}</dd><dt>Набор ведущих</dt><dd>{item.leadRecruitOpen?'Открыт':'Закрыт'}</dd><dt>Набор стажёров</dt><dd>{item.traineeRecruitOpen?'Открыт':'Закрыт'}</dd></dl><p className="scope-note">Заявки, педсостав и должности доступны ниже. Управление отрядами и программа появятся в следующих этапах.</p></section><Staffing key={item.id} shift={item} user={user}/></>;
+ const item=query.data.shift;if(squadId!==null)return <SquadDetail shiftId={item.id} squadId={squadId}/>;return <><section className="panel"><span className="status">{stages[item.stage]}</span><h2>{item.title}</h2><p className="muted">{dateLabel(item.startDate)} — {dateLabel(item.endDate)}</p>{item.description&&<p className="multiline">{item.description}</p>}<dl><dt>Видимость</dt><dd>{visibility[item.visibility]}</dd><dt>Набор ведущих</dt><dd>{item.leadRecruitOpen?'Открыт':'Закрыт'}</dd><dt>Набор стажёров</dt><dd>{item.traineeRecruitOpen?'Открыт':'Закрыт'}</dd></dl><p className="scope-note">Заявки, педсостав, должности и доступные отряды показаны ниже. Управление отрядами и программа появятся в следующих этапах.</p></section><Squads key={'squads:'+item.id} shiftId={item.id} open={openSquad}/><Staffing key={'staffing:'+item.id} shift={item} user={user}/></>;
 }
 function CreateShift({saved}:{saved:(shift:Shift)=>void}){
  const mutation=useMutation({mutationFn:(body:unknown)=>api<{shift:Shift}>('/shifts',body),onSuccess:data=>saved(data.shift)});

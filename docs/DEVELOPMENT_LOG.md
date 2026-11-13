@@ -1,5 +1,15 @@
 # Журнал разработки
 
+## 2026-11-13 — этап 3: read-only Squad metadata
+- На feature branch `feat/squads-read-only` реализован первый вертикальный срез: список и detail метаданных отрядов в контексте смены. DTO allowlist: `id/name/color/sortOrder`; Prisma schema и migrations не менялись.
+- D1/D2/D3/D14/D12 APPROVED: active + shift visibility; `view_all` для всех отрядов смены; иначе `view_own` по серверной связи через `ShiftRole.squadId` или `SquadMember.userId`; membership без permission не даёт доступ; несколько членств допустимы; list без view permissions — 403, hidden/foreign detail — 404.
+- Добавлены backend policy/service/routes и PostgreSQL integration tests на union scope, pagination/count, cross-shift/hidden/IDOR, inactive/unauth, strict query и DTO. Frontend добавил список/detail внутри ShiftDetail, loading/empty/error/403/404/retry, keyboard/back navigation, mobile/dark/reduced-motion-compatible UI. Staffing не расширялся.
+- Проверки после интеграции: 107 backend + 33 frontend tests PASS; lint, typecheck, build PASS; browser smoke с реальным API/PostgreSQL PASS (staffing regression + Squad list/detail, union scope, direct 404, denied access, empty, revoked-access cache/retry, keyboard/back, mobile/dark, no overflow/page errors/React warnings).
+
+## Примечание
+Изменения вложенного dirty worktree `.claude/worktrees/agent-a427cb9d5e9e0ca05` не трогались и не включаются в feature branch.
+
+
 ## 2026-11-11 — начало этапа 2
 - Проверены чистый status, main == origin/main f084151 после fetch; создана feat/shift-applications.
 - Foundation не переписывается. Baseline: lint/typecheck/build PASS, 66 backend + 6 frontend tests PASS.

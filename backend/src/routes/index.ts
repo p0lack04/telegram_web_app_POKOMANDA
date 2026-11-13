@@ -7,6 +7,7 @@ import { requireRule } from '../errors.js';
 import { selfDto } from '../services/dto.js';
 import type { AuthService } from '../services/auth.js';
 import { registerStaffingRoutes } from './staffing.js';
+import { registerSquadRoutes } from './squads.js';
 import type { Config } from '../config.js';
 
 export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthService,config:Config) {
@@ -16,6 +17,7 @@ export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthSe
  const activeUser=async (request:FastifyRequest)=> { const user=await userFor(request); requireActive(user); return user; };
  const admin=async (request:FastifyRequest)=> { const user=await userFor(request); requireAdmin(user); return user; };
  registerStaffingRoutes(app,db,activeUser);
+ registerSquadRoutes(app,db,activeUser);
  const audit=(actor:User,action:string,entityType:string,entityId:string)=>({actorId:actor.id,action,entityType,entityId});
  app.get('/health',async()=>({status:'ok'}));
  app.post('/api/auth/telegram', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(request,reply)=>{

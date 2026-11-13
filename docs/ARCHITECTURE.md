@@ -31,6 +31,17 @@ Raw Telegram initData → HMAC SHA256 (ключ WebAppData), timingSafeEqual, с
 - История построена на AuditLog, сохраняется после снятия роли. Пользователь видит собственные события; менеджер должностей не получает чужие application decisions; ADMIN видит полный staffing audit смены. Shared DTO не содержит Telegram ID/контакты/даты рождения.
 - Результат рассмотрения и назначения сохраняется в Notification в той же transaction. Реализуется только in-app inbox, не обещаем отправку Telegram. Outbox worker остаётся последующим этапом.
 
+## ADR-005 — этап 3: read-only метаданные отрядов (APPROVED, 2026-11-13)
+
+Решения владельца продукта, не расширяющие текущий staffing:
+- **D1 APPROVED:** только список и карточка метаданных `id/name/color/sortOrder`. Без количества, состава детей/сотрудников, CRUD, архивации, membership mutations, DailyMark, комнат, оплаты и заезда.
+- **D2 APPROVED:** итоговый permission set вычисляется существующим resolver по должностям той же смены. `squad.view_all` разрешает все отряды доступной смены; иначе `squad.view_own` требует связь через `ShiftRole.squadId` или `SquadMember.userId` с совпадающими user/shift/squad. Источники объединяются, null squadId не даёт связи. Фильтр применяется в БД до пагинации и count разрешённых отрядов.
+- **D3 APPROVED:** membership само по себе не даёт permissions. Без обоих view permissions новый list возвращает 403; detail не раскрывает объект (404). `squad.manage` не заменяет право просмотра.
+- **D14 APPROVED:** active/auth по существующим соглашениям; невидимая смена, отсутствующий/чужой/недоступный отряд и неверная пара shift+squad — 404. Для list видимой смены отсутствие view permission — 403. List и detail используют общий object scope, не различают скрытые и отсутствующие target ID.
+- **D12 APPROVED:** несколько членств сотрудника в разных отрядах одной смены допустимы. Это не расширяет permission set. Назначение должности не создаёт membership и наоборот; ShiftRole.squadId остаётся optional.
+- Schema/миграции и ROLE_PERMISSIONS не изменяются. Существующий staffing metadata endpoint сохраняет минимальный список id/name для shift.manage_roles; он не становится API состава или новым Squad API.
+- Отложены: lifecycle участника/членства, история переводов, обязательность фамилии ребёнка, архивация/удаление и все полевые права состава. Эти решения не блокируют метаданные и не считаются утверждёнными данным ADR.
+
 ## Этапы и критерии приёмки
 0. Аудит, baseline, полная карта функций (документы, без изменения TXT).
 1. Воспроизводимый workspace, полная доменная схема с начальной миграцией, безопасный auth → onboarding → подтверждение → список/создание смен UI/API/DB; negative tests и сборки.
