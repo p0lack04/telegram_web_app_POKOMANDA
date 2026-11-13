@@ -1,6 +1,6 @@
 # Контекст проекта «Команда»
 
-Актуализировано: 2026-11-11, этап 2 реализован в PR [#3](https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/3), merge выполняет пользователь. Проверки: 99 backend + 25 frontend tests, lint/typecheck/build/browser PASS, npm audit 0.
+Актуализировано: 2026-11-13. Foundation и этап 2 объединены в main (PR #3). Первый срез этапа 3 реализует read-only список/карточку метаданных отрядов, не весь этап. Решения D1/D2/D3/D14/D12 — APPROVED владельцем; см. ADR-005 в ARCHITECTURE.md. DTO строго id/name/color/sortOrder, view_all либо view_own по связи role/member той же смены, membership без permission не даёт доступ, несколько членств допустимы; list без permission 403, скрытый/чужой detail 404. Schema/миграции и каталог permissions не меняются. CRUD, count, состав, дети и DailyMark остаются следующими срезами.
 
 ## Отправная точка
 Production Foundation объединён в main (PR #1). Перед этапом 2 main/origin/main = f084151; рабочее дерево чистое. Исходные TXT удалены из отслеживаемого Git tree предыдущими коммитами, но локальные `1.txt`, `2.txt`, `3.txt` в корне существуют и приоритетны как источник требований. Не изменять и не добавлять их обратно в Git без задачи.

@@ -23,6 +23,7 @@ export interface Shift {
  visibility:'ADMIN_ONLY'|'ADMIN_LEAD'|'ADMIN_LEAD_TRAINEE';stage:'STAGE_1'|'STAGE_2'|'STAGE_3'|'STAGE_4';leadRecruitOpen:boolean;traineeRecruitOpen:boolean;
 }
 export interface StaffingInfo {canReview:boolean;canManageRoles:boolean;positions:string[];squads:{id:string;name:string}[]}
+export interface Squad {id:string;name:string;color:string|null;sortOrder:number}
 export interface Page<T> {items:T[];total:number;page:number;pageSize:number}
 export const roles={ADMIN:'Руководитель',LEAD:'Ведущий',TRAINEE:'Стажёр'};
 export const stages={STAGE_1:'Отбор педсостава',STAGE_2:'Отбор стажёров',STAGE_3:'Программа и роли',STAGE_4:'Проведение смены'};

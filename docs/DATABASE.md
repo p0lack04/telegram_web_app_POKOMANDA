@@ -16,6 +16,10 @@ Prisma schema: `backend/prisma/schema.prisma`; PostgreSQL. Foundation migration 
 - Проверено применение всех миграций на чистой временной PostgreSQL и foundation→002→003 с ранее созданными User/Shift/Application. Production БД не изменялась. Перед применением на постоянной БД — backup и `npm run db:deploy`; разрушительных операций нет.
 - Scoped mutation создаёт AuditLog и Notification в той же транзакции; параллельные заявки/решения проверены реальными HTTP-тестами.
 
+## Этап 3 — read-only Squad
+
+D1/D2/D3/D14/D12 утверждены владельцем 2026-11-13; см. ADR-005 в [ARCHITECTURE](ARCHITECTURE.md). Первый срез использует существующие Squad/ShiftRole/SquadMember только для чтения. Prisma schema и миграции не изменяются. SELECT метаданных: id/name/color/sortOrder; members/roles используются только как EXISTS-фильтры scope, не выдаются в DTO. Допустимы несколько membership одного сотрудника в разных отрядах одной смены; существующие unique и staffing validations сохраняются. Модель Child identity, активное/завершённое членство, перевод, archivedAt/status и конфликт обязательности lastName остаются решениями будущих срезов, без миграций в этой задаче.
+
 ## Миграционная стратегия
 Аддитивные изменения отдельной миграцией. Application.version — optimistic concurrency для решений; история решений/назначений — AuditLog с subjectUserId в безопасных details. Новые индексы под собственные заявки/назначения и историю. Старые данные сохраняются, никаких TRUNCATE/reset/db push. Проверки: migrate deploy на чистую PostgreSQL + replay foundation→следующая миграция на данных foundation, сохранение строк и уникальности.
 

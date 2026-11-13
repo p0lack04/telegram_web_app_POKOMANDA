@@ -1,5 +1,13 @@
 # Roadmap до production
 
+## Актуальный продуктовый срез — 2026-11-13
+
+Foundation и этап 2 (заявки/допуск/должности) объединены в main. Нумерация ниже — исторические технические потоки, а не основание переименовывать текущий продуктовый этап 3 «Отряды, дети и участники».
+
+Первый срез этапа 3 ограничен read-only списком и карточкой метаданных отрядов. D1/D2/D3/D14/D12 APPROVED: DTO id/name/color/sortOrder; view_all либо view_own с серверной связью через role/member; membership без permission не даёт доступа; несколько членств допустимы; скрытый/чужой detail 404, list без view permissions 403. Полный контракт — ADR-005 в [ARCHITECTURE](ARCHITECTURE.md).
+
+Не входят и остаются следующими самостоятельными задачами: Squad CRUD, состав детей/сотрудников и count, Child CRUD/identity, распределение/переводы, membership lifecycle, архивация, комнаты/оплата/заезд, DailyMark. Schema и миграции первого среза не меняются. Реальная готовность — в [FEATURE_MATRIX](FEATURE_MATRIX.md), проверки — в [DEVELOPMENT_LOG](DEVELOPMENT_LOG.md).
+
 ## Этап 0 — зафиксировать базу
 - Получить полный исходник и подтвердить актуальность `3.txt`.
 - Создать воспроизводимый React + TypeScript build.
