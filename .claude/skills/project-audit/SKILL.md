@@ -1,8 +1,10 @@
 ---
 name: project-audit
-description: Аудит существующего репозитория, выявление заглушек, карта функций и план безопасной модернизации.
+description: Полный аудит при неизвестной или существенно изменившейся структуре либо по запросу; не для каждого исправления.
 ---
 # Project audit
+
+Сначала используй docs/PROJECT_CONTEXT.md и docs/FEATURE_MATRIX.md. Не повторяй полный аудит и уже выполненное исследование без технической причины; ограничь поиск согласованным scope.
 
 1. Сними дерево репозитория и определи entrypoints, package manager, scripts, frontend/backend, DB, deployment, tests.
 2. Прочитай README, manifests, env examples, migrations, workflows и исходные ключевые модули.
@@ -14,4 +16,4 @@ description: Аудит существующего репозитория, вы�
 8. Отдельно проверь privacy/PII и несовершеннолетних.
 9. Составь риски P0/P1/P2 и план вертикальных срезов с критериями приёмки.
 10. Не делай destructive rewrite. Не удаляй рабочий сценарий без эквивалента.
-Вывод: `docs/audit/BASELINE.md`, `docs/audit/FEATURE-MATRIX.md`, `docs/architecture/DECISIONS.md` (если проект уже использует docs — следуй его структуре).
+Обновляй существующие docs/FEATURE_MATRIX.md, docs/ARCHITECTURE.md и docs/DEVELOPMENT_LOG.md по scope, не создавай копий. Результат: baseline, findings с file:line, delta матрицы и критерии приёмки.
