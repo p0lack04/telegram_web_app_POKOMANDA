@@ -1,19 +1,24 @@
 # ПО «Команда» — Telegram Mini App
 
-**Статус: Foundation, этап 2 и первый read-only Squad-срез этапа 3 реализованы; весь продукт и этап 3 ещё не завершены.**
+**Статус: Foundation, этап 2 и backend/UI-срез этапа 3 (дети и XLSX) реализованы; полный этап 3 ещё не завершён.**
 
-## Этап 3 — метаданные отрядов
+## Этап 3 — отряды, дети и участники
 
-Внутри смены доступны список и карточка отрядов. D1/D2/D3/D14/D12 APPROVED: DTO только `id/name/color/sortOrder`; active account + visibility + итоговый `squad.view_all` либо `squad.view_own` с серверной связью через ShiftRole/SquadMember той же смены. Membership без permission не даёт доступ; несколько членств допустимы. CRUD, количество и состав участников, дети, DailyMark, комнаты/оплата/заезд не входят в срез. Prisma schema и migrations без изменений.
+Внутри смены доступны список и карточка отрядов, состав детей, ручное создание, размещение и XLSX workflow upload → preview → explicit commit. Дети остаются `SquadMember` типа `CHILD` внутри конкретной смены; медицинские и родительские данные не собираются. DTO отряда сохраняет совместимость PR #5: только `id/name/color/sortOrder`. Права и scope проверяются сервером.
 
 | Метод | Путь | Ответ / доступ |
 |---|---|---|
 | GET | `/api/shifts/:id/squads?page=1&pageSize=20` | `{items,total,page,pageSize}`; total — число разрешённых отрядов, не участников; pageSize ≤ 100 |
 | GET | `/api/shifts/:id/squads/:squadId` | `{squad}`; тот же object scope |
+| GET | `/api/shifts/:id/squads/:squadId/children?page=1&pageSize=20` | список детей разрешённого отряда |
+| POST | `/api/shifts/:id/squads/:squadId/children` | ручное создание CHILD, `squad.manage` |
+| PATCH | `/api/shifts/:id/squads/:squadId/children/:memberId` | размещение, `participants.edit_room` |
+| POST | `/api/shifts/:id/children/import/preview` | XLSX preview, `participants.import` |
+| POST | `/api/shifts/:id/children/import/:jobId/commit` | явное подтверждение и транзакционная запись |
 
 Список видимой смены без view permissions — 403. Несуществующая/невидимая смена и недоступный/чужой detail — 404. Query строгий, клиентский userId не принимается. Новые Squad endpoints не меняют staffing metadata/assignment contracts. Решения: [ADR-005](docs/ARCHITECTURE.md), [права](docs/PERMISSIONS.md).
 
-Исходные TXT исключены из отслеживаемого Git tree; локальные файлы в корне сохранены и используются для сверки требований. Демо не включено в production bundle. Сейчас работают Telegram auth/session, онбординг/подтверждение анкет, смены с серверной видимостью, заявки/решения, допуск сотрудников и назначение должностей, история и собственные in-app уведомления. Отряды доступны только как read-only метаданные; программа, банк, опросы и внешние интеграции пока не являются готовыми пользовательскими модулями. Подробности: [матрица функций](docs/FEATURE_MATRIX.md).
+Исходные TXT исключены из отслеживаемого Git tree; локальные файлы в корне сохранены и используются для сверки требований. Демо не включено в production bundle. Сейчас работают Telegram auth/session, онбординг, смены, staffing, метаданные отрядов, дети и XLSX import. Squad CRUD, архивирование, capacity policy, DailyMark, программа, банк, опросы и внешние интеграции пока не являются готовыми модулями. Подробности: [матрица функций](docs/FEATURE_MATRIX.md).
 
 ## Стек
 - React 18, TypeScript, Vite 8, TanStack Query.

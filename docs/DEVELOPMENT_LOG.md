@@ -1,5 +1,13 @@
 # Журнал разработки
 
+## Этап 3 — дети и XLSX
+
+- Реализованы `ChildrenService`, ручное создание CHILD, список/detail и PATCH размещения с object scope и аудитом.
+- Реализован XLSX parse → preview → mapping → explicit commit: TTL, partial import, ambiguity, no-op, snapshot и очистка preview PII.
+- Parser hardening проверяет local/central directory, data descriptors, CRC, offsets/ranges, decompression и aggregate limits. Добавлены security regression tests.
+- UI подключает состав отряда, создание, размещение и импорт с loading/error/empty/success состояниями.
+- Миграция не нужна: использованы существующие `SquadMember` и `ImportJob`; архивирование/удаление/вместимость и staffing membership lifecycle не утверждены.
+
 ## 2026-11-13 — этап 3: read-only Squad metadata
 - На feature branch `feat/squads-read-only` реализован первый вертикальный срез: список и detail метаданных отрядов в контексте смены. DTO allowlist: `id/name/color/sortOrder`; Prisma schema и migrations не менялись.
 - D1/D2/D3/D14/D12 APPROVED: active + shift visibility; `view_all` для всех отрядов смены; иначе `view_own` по серверной связи через `ShiftRole.squadId` или `SquadMember.userId`; membership без permission не даёт доступ; несколько членств допустимы; list без view permissions — 403, hidden/foreign detail — 404.

@@ -75,3 +75,28 @@ describe('squad read HTTP + PostgreSQL',()=>{
   expect((await get(own,`${list()}?userId=${admin.id}`)).statusCode).toBe(400);expect((await get(own,`${detail(a)}?userId=${admin.id}`)).statusCode).toBe(400);
  });
 });
+
+describe('child endpoints',()=>{
+ const url=()=>`/api/shifts/${shift}/squads/${a}/children`;
+ const post=(actor:User,payload:object)=>app.inject({method:'POST',url:url(),headers:{cookie:cookies.get(actor.id)!,origin},payload});
+ it('view_all cannot widen local squad management',async()=>{
+  await db.shiftRole.create({data:{userId:all.id,shiftId:shift,position:'Ведущий отряда',squadId:a}});
+  const payload={firstName:'Scope',lastName:'Synthetic',birthDate:'2015-01-02'};
+  expect((await post(all,payload)).statusCode).toBe(201);
+  expect((await get(all,`/api/shifts/${shift}/squads/${d}`)).statusCode).toBe(200);
+  expect((await app.inject({method:'POST',url:`/api/shifts/${shift}/squads/${d}/children`,headers:{cookie:cookies.get(all.id)!,origin},payload})).statusCode).toBe(404);
+ });
+ it('checks management scope and immutable identity',async()=>{
+  const payload={firstName:'Имя',lastName:'Фамилия',birthDate:'2015-01-02'};
+  expect((await post(own,payload)).statusCode).toBe(403);
+  expect((await post(admin,{...payload,userId:admin.id})).statusCode).toBe(400);
+  const created=await post(admin,payload);expect(created.statusCode).toBe(201);
+  const id=created.json().member.id as string;
+  expect((await get(own,`${url()}/${id}`)).statusCode).toBe(200);
+  expect((await get(nullRole,`${url()}/${id}`)).statusCode).toBe(404);
+  expect((await app.inject({method:'PATCH',url:`${url()}/${id}`,headers:{cookie:cookies.get(admin.id)!,origin},payload:{firstName:'Другое'}})).statusCode).toBe(400);
+  const changed=await app.inject({method:'PATCH',url:`${url()}/${id}`,headers:{cookie:cookies.get(admin.id)!,origin},payload:{building:'A',room:'1',squadId:b}});
+  expect(changed.statusCode).toBe(200);expect(changed.json().member.squadId).toBe(b);
+  expect((await get(admin,`${url()}/${id}`)).statusCode).toBe(404);
+ });
+});

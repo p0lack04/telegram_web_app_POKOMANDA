@@ -1,11 +1,15 @@
 # Матрица функций — 2026-11-13
 
-## Этап 3 — read-only Squad (APPROVED решения D1/D2/D3/D14/D12)
+## Этап 3 — Squad, дети и XLSX (D15–D21)
 
 | Экран / действие | UI / источник | Persistence / API | Auth / scope | Тест | Статус |
 |---|---|---|---|---|---|
 | Список и карточка метаданных отряда | `frontend/src/Squads.tsx`, `ShiftDetail` | `GET /api/shifts/:id/squads`, `GET /api/shifts/:id/squads/:squadId`; Prisma schema без изменений | active + shift visibility; `squad.view_all` либо scoped `squad.view_own`; membership без permission не даёт доступ; скрытый detail 404 | backend integration, frontend, browser smoke | **готово этап 3, read-only** |
 | Количество, состав детей/сотрудников, Squad CRUD, DailyMark | будущие модули | не реализовано | отдельные object/field policies pending | нет | **схема / не входит в срез** |
+| Состав детей отряда | `frontend/src/Squads.tsx` | `GET /shifts/:id/squads/:squadId/children` | view scope отряда | backend integration + UI | **готово backend/UI** |
+| Создание CHILD | `Squads.tsx` | `POST .../children` | `squad.manage` в доступном отряде | integration | **готово backend/UI** |
+| Размещение/перевод CHILD | `Squads.tsx` | `PATCH .../children/:memberId` | `participants.edit_room`, same shift | integration/no-op | **готово backend/UI** |
+| XLSX preview/mapping/commit | `Squads.tsx` | `/children/import/*`, `ImportJob` | import + edit_room для обновлений; TTL | integration + parser security | **готово backend/UI** |
 
 Статусы: **готово v1** = есть реальный UI → API → PostgreSQL, серверная auth/policy и тесты; **схема** = модель/решение заложены, use-case ещё не подключён; **прототип** = только `3.txt`, не production; **не начато**.
 

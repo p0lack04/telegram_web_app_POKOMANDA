@@ -19,3 +19,11 @@ export async function api<T>(path:string,body?:unknown,method?:'GET'|'POST'|'PAT
  }
  return data as T;
 }
+export async function upload<T>(path:string,file:File):Promise<T> {
+ let response:Response;
+ try {response=await fetch('/api'+path,{method:'POST',credentials:'include',headers:{'Content-Type':file.type||'application/octet-stream'},body:file});}
+ catch {throw new ApiError(0,'NETWORK_ERROR','Нет связи с сервером. Проверьте подключение и повторите запрос');}
+ const data:unknown=await response.json().catch(()=>null);
+ if(!response.ok){const error=data&&typeof data==='object'&&'error' in data&&data.error&&typeof data.error==='object'?data.error:null;throw new ApiError(response.status,error&&'code' in error&&typeof error.code==='string'?error.code:'REQUEST_ERROR',error&&'message' in error&&typeof error.message==='string'?error.message:'Не удалось выполнить запрос');}
+ return data as T;
+}

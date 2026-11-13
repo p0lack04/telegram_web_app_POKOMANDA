@@ -1,4 +1,8 @@
-# Права: staffing и Squad read-only
+# Права: staffing, Squad и дети
+
+## Дети и импорт
+
+`participants.import` разрешает загрузку и создание preview в видимой смене и доступных отрядах. `participants.edit_room` разрешает ручное изменение `squadId/building/room`; обновление существующих строк XLSX требует обоих разрешений. Ручное создание CHILD требует `squad.manage`. ФИО, дата рождения, `memberType` и `userId` после создания не изменяются. Сначала проверяются active account, видимость смены и object scope, затем permission.
 
 ## Squad read-only (этап 3, D1/D2/D3/D14/D12 APPROVED — 2026-11-13)
 
