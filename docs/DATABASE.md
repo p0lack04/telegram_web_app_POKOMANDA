@@ -20,6 +20,10 @@ Prisma schema: `backend/prisma/schema.prisma`; PostgreSQL. Foundation migration 
 
 D1/D2/D3/D14/D12 утверждены владельцем 2026-11-13; см. ADR-005 в [ARCHITECTURE](ARCHITECTURE.md). Первый срез использует существующие Squad/ShiftRole/SquadMember только для чтения. Prisma schema и миграции не изменяются. SELECT метаданных: id/name/color/sortOrder; members/roles используются только как EXISTS-фильтры scope, не выдаются в DTO. Допустимы несколько membership одного сотрудника в разных отрядах одной смены; существующие unique и staffing validations сохраняются. Модель Child identity, активное/завершённое членство, перевод, archivedAt/status и конфликт обязательности lastName остаются решениями будущих срезов, без миграций в этой задаче.
 
+## Дети и XLSX import
+
+Текущая схема уже содержит `SquadMember` и `ImportJob`, поэтому новая миграция не требуется. CHILD — запись `SquadMember` внутри `shiftId`; import job хранит preview JSON до одного часа, после commit заменяется обезличенным результатом. Исходный XLSX не сохраняется. FK `SquadMember.squad` с `ON DELETE RESTRICT` не позволяет удалить отряд с составом. Commit блокирует `Shift`, повторно проверяет scope и snapshot, а состояние `ImportJob` защищает от повторной записи.
+
 ## Миграционная стратегия
 Аддитивные изменения отдельной миграцией. Application.version — optimistic concurrency для решений; история решений/назначений — AuditLog с subjectUserId в безопасных details. Новые индексы под собственные заявки/назначения и историю. Старые данные сохраняются, никаких TRUNCATE/reset/db push. Проверки: migrate deploy на чистую PostgreSQL + replay foundation→следующая миграция на данных foundation, сохранение строк и уникальности.
 

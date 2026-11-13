@@ -24,6 +24,7 @@ export interface Shift {
 }
 export interface StaffingInfo {canReview:boolean;canManageRoles:boolean;positions:string[];squads:{id:string;name:string}[]}
 export interface Squad {id:string;name:string;color:string|null;sortOrder:number}
+export interface Child {id:string;squadId:string;firstName:string;lastName:string;middleName:string|null;birthDate:string|null;building:string|null;room:string|null}
 export interface Page<T> {items:T[];total:number;page:number;pageSize:number}
 export const roles={ADMIN:'Руководитель',LEAD:'Ведущий',TRAINEE:'Стажёр'};
 export const stages={STAGE_1:'Отбор педсостава',STAGE_2:'Отбор стажёров',STAGE_3:'Программа и роли',STAGE_4:'Проведение смены'};
