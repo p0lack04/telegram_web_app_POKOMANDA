@@ -12,7 +12,7 @@ description: Проектирование PostgreSQL/Prisma схемы, мигр
 - Не дублируй один FK в обеих моделях без необходимости; для 1:1/1:N зафиксируй единственный владеющий FK.
 - Индексы проектируй по реальным фильтрам: shiftId, squadId, userId, date, status, createdAt.
 - Для оплаты partial уточни хранение суммы/комментария/подтверждения; одного enum может быть недостаточно.
-- Для SurveyAnswer рассмотри SurveySubmission + unique(userId, surveyId), если один проход на опрос.
+- SurveySubmission — атомарная уникальная запись userId + surveyId; повторы запрещены. DailyMark уникальна по SquadMember + календарной дате в timezone смены. TechRequest владеет единственным programItemId.
 - Файлы храни в object storage; в БД только metadata, storage key, checksum, MIME, size, uploader, access scope.
 - Миграции именуй осмысленно; не редактируй уже применённые миграции.
 - Seed — только для dev/test и не должен содержать реальные персональные данные.

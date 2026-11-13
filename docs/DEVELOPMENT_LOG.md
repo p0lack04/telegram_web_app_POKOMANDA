@@ -31,3 +31,9 @@
 - Ветка feat/shift-applications, PR [#3](https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/3) в main, без merge.
 - Опубликованные логические коммиты: 60588fe (контекст), 6e11602 (API/миграция/тесты), ca2599b (notification scope fix), 4c17b72 (UI/browser), 07313ce (документация).
 - Финальный snapshot: 124 tests PASS, browser PASS, lint/typecheck/build PASS, audit 0. Тестовые сервисы остановлены. Следующий функциональный этап — отряды/участники и полевые права; Telegram delivery остаётся отдельно.
+
+## 2026-11-13 — конфигурация Claude Code
+- Только конфигурация/docs: сокращены CLAUDE/Git rules, 5 agents → implementation/sonnet + quick-scout/haiku + security-reviewer/sonnet; 9 skills сохранены, 4 уточнены. Подробности: [аудит конфигурации](CLAUDE_CODE_CONFIG.md). Roadmap/продуктовые статусы/API/Prisma/UI не менялись.
+- Ветка chore/claude-code-token-optimization уже существовала; пользователь подтвердил продолжение без переключения и исключение грязного вложенного gitlink. После fetch HEAD == origin/main. Удаление четырёх старых agent-файлов отдельно подтверждено.
+- Финальные проверки: lint/typecheck/build PASS, 99 backend + 25 frontend tests PASS; browser smoke PASS (real API/PostgreSQL). Статический node scripts/check-claude-config.mjs PASS. Install не требовался, миграции не менялись.
+- settings/env/секреты и пользовательская конфигурация не менялись; live Tooken routing/billing не проверены. gh отсутствует; PR требует доступного CLI/авторизации.
