@@ -6,6 +6,7 @@ dist/
 coverage/
 playwright-report/
 test-results/
+.claude/worktrees/
 uploads/
 *.log
 1.txt
