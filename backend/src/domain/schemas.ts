@@ -33,3 +33,10 @@ export const recruitmentSchema = z.object({leadRecruitOpen:z.boolean().optional(
 export const positionSchema = z.object({userId:z.string().min(1).max(100),position:z.string().trim().min(1).max(120),squadId:z.string().min(1).max(100).nullable().optional()}).strict();
 export const searchQuery = pagination.extend({search:z.string().trim().max(100).default('')}).strict();
 export const notificationIdParam = z.object({id:z.string().min(1).max(100)}).strict();
+export const squadCreateSchema = z.object({name:z.string().trim().min(1).max(120),color:z.string().regex(/^#[\\da-f]{6}$/i).nullable().optional(),sortOrder:z.number().int().min(-100000).max(100000).default(0)}).strict();
+export const squadUpdateSchema = squadCreateSchema.partial().strict().refine(v=>Object.keys(v).length>0,'������� ���������');
+export const staffCreateSchema = z.object({userId:z.string().min(1).max(100),memberType:z.enum(['LEAD','TRAINEE'])}).strict();
+export const memberMoveSchema = z.object({squadId:z.string().min(1).max(100)}).strict();
+export const paymentSchema = z.object({paymentStatus:z.enum(['UNPAID','PARTIAL','PAID']),paymentNote:z.string().trim().max(500).optional().nullable()}).strict();
+export const checkinSchema = z.object({checkinStatus:z.boolean()}).strict();
+export const dailyMarkSchema = z.object({date:dateOnly,markType:z.enum(['FULL_DAY','TECHNIC']),note:z.string().trim().max(500).optional().nullable()}).strict();

@@ -237,6 +237,7 @@ model SquadMember {
  dailyMarks DailyMark[]
  @@unique([squadId,userId])
  @@index([shiftId,memberType])
+ @@index([shiftId,checkinStatus,memberType])
  @@index([userId])
 }
 model ShiftRole {

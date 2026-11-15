@@ -65,3 +65,10 @@ Baseline: npm.cmd run lint/typecheck/build вЂ” PASS; npm.cmd test вЂ” 123 backen
 - РСЃРїСЂР°РІР»РµРЅ browser smoke-СЃС†РµРЅР°СЂРёР№ РїРµСЂРµРІРѕРґР° СЂРµР±С‘РЅРєР°: РІС‹Р±РѕСЂ РѕС‚СЂСЏРґР° РёСЃРїРѕР»СЊР·СѓРµС‚ СЃС‚Р°Р±РёР»СЊРЅС‹Р№ `select[name="squadId"]`, СЃС†РµРЅР°СЂРёР№ Р±РѕР»СЊС€Рµ РЅРµ Р·Р°РІРёСЃРёС‚ РѕС‚ РЅРµРѕРґРЅРѕР·РЅР°С‡РЅРѕР№ label.
 - РџРѕР»РЅС‹Рµ РїСЂРѕРІРµСЂРєРё РІРЅРµ sandbox: `npm.cmd test -- --run` вЂ” 127 backend + 40 frontend PASS; `npm.cmd run test:browser` вЂ” PASS (РґРµС‚Рё, СЂР°Р·РјРµС‰РµРЅРёРµ/РїРµСЂРµРІРѕРґ, XLSX preview/mapping/partial commit/idempotency/TTL/retry, РїСЂР°РІР° read-only, mobile/dark/reduced motion).
 - `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build` вЂ” PASS. РЎСЂРµР· 3Рђ РїСЂРёРЅСЏС‚; 3Р‘ (Squad CRUD Рё С‡Р»РµРЅСЃС‚РІРѕ РїРµРґСЃРѕСЃС‚Р°РІР°) РѕСЃС‚Р°С‘С‚СЃСЏ СЃР»РµРґСѓСЋС‰РёРј СЌС‚Р°РїРѕРј РїРѕСЃР»Рµ СЃРѕРіР»Р°СЃРѕРІР°РЅРёСЏ lifecycle.
+
+## 2026-11-15 — этапы 3Б/3В: отряды, педсостав и полевые отметки
+- Добавлены защищённые Squad CRUD endpoints с проверкой active account, visibility, `squad.manage`, object scope и транзакционным AuditLog. Удаление отряда с участниками отклоняется ограничением FK/409.
+- Добавлены список, добавление, перевод и снятие педагогического членства. Добавление требует подтверждённого аккаунта и APPROVED application на ту же смену; членство не изменяет глобальную роль и не создаётся назначением должности.
+- Добавлены отдельные mutation endpoints для paymentStatus/paymentNote и checkinStatus, включая обязательную непустую заметку для PARTIAL и field-level permissions. Добавлены DailyMark upsert/list с уникальностью member+date, scope и audit.
+- Frontend карточка отряда показывает педсостав и доступные действия оплаты/заезда с обновлением TanStack Query.
+- Проверки: `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build` — PASS; `npm.cmd test -- --run` запускается, но embedded PostgreSQL в sandbox завершается `uv_os_get_passwd ENOMEM`; frontend tests PASS.

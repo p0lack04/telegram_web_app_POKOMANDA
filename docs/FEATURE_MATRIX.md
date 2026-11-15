@@ -86,3 +86,9 @@ Foundation Рё СЌС‚Р°Рї 2 СЂР°Р±РѕС‚Р°СЋС‚. РЎСЂРµР· 3Рђ РёСЃРїСЂР°РІР»СЏРµС‚ РґР
 РџСЂРѕРІРµСЂРєРё СЃСЂРµР·Р° 3Рђ: 127 backend + 40 frontend tests PASS. Browser smoke СЂР°СЃС€РёСЂРµРЅ РґРµС‚СЊРјРё/XLSX; РѕРєРѕРЅС‡Р°С‚РµР»СЊРЅС‹Рµ СЂРµР·СѓР»СЊС‚Р°С‚С‹ lint/typecheck/build/browser Рё РѕРіСЂР°РЅРёС‡РµРЅРёСЏ вЂ” РІ [Р¶СѓСЂРЅР°Р»Рµ](DEVELOPMENT_LOG.md).
 
 Р”РѕРєР°Р·Р°С‚РµР»СЊСЃС‚РІР° РґРµС„РµРєС‚РѕРІ вЂ” [Р°СѓРґРёС‚](audit/INITIAL-REPOSITORY-REVIEW.md). РџСЂРµРґР»РѕР¶РµРЅРЅС‹Р№ РїРѕСЂСЏРґРѕРє Рё РїСЂРёС‘РјРєР° вЂ” [РїР»Р°РЅ](IMPLEMENTATION-ROADMAP.md). РџРµСЂРµСЃРјРѕС‚СЂ Р·Р°РєСЂС‹С‚С‹С… Р·Р°СЏРІРѕРє С‚СЂРµР±СѓРµС‚ РѕС‚РґРµР»СЊРЅРѕРіРѕ СЂРµС€РµРЅРёСЏ.
+
+## Статус этапов 3Б/3В (2026-11-15)
+
+- **3Б готово v1:** Squad CRUD, список/добавление/перевод/снятие педсостава, проверка APPROVED допуска, object/scope policies и audit.
+- **3В готово v1:** отдельные payment/check-in mutations, PARTIAL note invariant, DailyMark list/upsert с уникальностью member+date, field-level permissions и audit; UI педсостава отображает и меняет оплату/заезд.
+- PostgreSQL schema использована без изменения моделей; добавлена additive migration `202611150004_stage_3bc`.

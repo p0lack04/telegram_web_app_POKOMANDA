@@ -24,7 +24,15 @@ export function SquadDetail({shiftId,squadId}:{shiftId:string;squadId:string}){
  if(query.isError)return <Failure error={query.error} retry={()=>void query.refetch()}/>;
  if(query.isPending)return <Loading/>;
  const squad=query.data.squad;
-  return <><section className="panel"><Color color={squad.color}/><h2>{squad.name}</h2><dl><dt>Цвет</dt><dd>{safeSquadColor(squad.color)??'Не указан'}</dd><dt>Порядок</dt><dd>{squad.sortOrder}</dd></dl></section><Children shiftId={shiftId} squadId={squadId}/></>;
+  return <><section className="panel"><Color color={squad.color}/><h2>{squad.name}</h2><dl><dt>Цвет</dt><dd>{safeSquadColor(squad.color)??'Не указан'}</dd><dt>Порядок</dt><dd>{squad.sortOrder}</dd></dl></section><Staff shiftId={shiftId} squadId={squadId}/><Children shiftId={shiftId} squadId={squadId}/></>;
+}
+function Staff({shiftId,squadId}:{shiftId:string;squadId:string}){
+ const client=useQueryClient();
+ const query=useQuery({queryKey:['staff',shiftId,squadId],queryFn:()=>api<{items:Array<{id:string;firstName:string;lastName:string;middleName?:string|null;memberType:string;paymentStatus:string;paymentNote?:string|null;checkinStatus:boolean}>}>(`/shifts/${shiftId}/squads/${squadId}/staff`),retry:false});
+ const update=useMutation({mutationFn:({id,kind,body}:{id:string;kind:'payment'|'checkin';body:object})=>api(`/shifts/${shiftId}/squad-members/${id}/${kind}`,body,'PATCH'),onSuccess:()=>void client.invalidateQueries({queryKey:['staff',shiftId,squadId]})});
+ if(query.isPending)return <section aria-labelledby="staff-heading"><h2 id="staff-heading">���������</h2><p role="status">��������� ������</p></section>;
+ if(query.isError)return <section className="notice error" role="alert"><h2>��������� ����������</h2><button className="secondary" onClick={()=>void query.refetch()}>���������</button></section>;
+ return <section aria-labelledby="staff-heading"><h2 id="staff-heading">���������</h2>{query.data.items.length===0?<div className="empty"><p>��������� ���� �� ��������.</p></div>:<div className="shift-list">{query.data.items.map(member=><article className="panel" key={member.id}><h3>{[member.lastName,member.firstName,member.middleName].filter(Boolean).join(' ')}</h3><p className="muted">{member.memberType==='LEAD'?'�������':'�����'} � ������: {member.paymentStatus==='PAID'?'��������':member.paymentStatus==='PARTIAL'?'��������':'�� ��������'} � �����: {member.checkinStatus?'��':'���'}</p><div className="form-actions"><button className="secondary" disabled={update.isPending} onClick={()=>update.mutate({id:member.id,kind:'checkin',body:{checkinStatus:!member.checkinStatus}})}>{member.checkinStatus?'�������� �����':'�������� �����'}</button><button className="secondary" disabled={update.isPending} onClick={()=>update.mutate({id:member.id,kind:'payment',body:{paymentStatus:member.paymentStatus==='PAID'?'UNPAID':'PAID'}})}>{member.paymentStatus==='PAID'?'����� ������':'�������� ������'}</button></div></article>)}</div>}</section>;
 }
 function Children({shiftId,squadId}:{shiftId:string;squadId:string}){
  const client=useQueryClient();const [page,setPage]=useState(1);const [form,setForm]=useState(false);const [placement,setPlacement]=useState<Child|null>(null);const [saved,setSaved]=useState(false);
@@ -42,3 +50,4 @@ function PlacementSquads({shiftId,squadId}:{shiftId:string;squadId:string}){
  if(query.isError)return <p role="alert">Не удалось загрузить отряды. <button type="button" onClick={()=>void query.refetch()}>Повторить</button></p>;
  return <label className="field"><span>Отряд</span><select name="squadId" defaultValue={squadId} disabled={query.isPending}>{query.data?query.data.map(s=><option key={s.id} value={s.id}>{s.name}</option>):<option value={squadId}>Загружаем…</option>}</select></label>;
 }
+
