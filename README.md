@@ -143,3 +143,9 @@ NODE_ENV=development ADMIN_TELEGRAM_ID=<ваш_числовой_Telegram_ID> npm
 - [ADR и этапы](docs/ARCHITECTURE.md)
 - [Отчёт этапа 1](docs/PHASE-1-REPORT.md)
 
+
+## Работа с ChatGPT и Codex
+
+Локальные инструкции, навыки, настройки агентов и граф исключены из Git. Для разработки начните с [контекста](docs/PROJECT_CONTEXT.md), [матрицы функций](docs/FEATURE_MATRIX.md), [аудита](docs/audit/INITIAL-REPOSITORY-REVIEW.md) и [этапов](docs/IMPLEMENTATION-ROADMAP.md).
+
+Аудит 2026-11-15: этап 3 частичен; дети и XLSX имеют backend/UI, но требуют исправлений и отдельной browser-приёмки. Актуальные результаты проверок — в документах выше.

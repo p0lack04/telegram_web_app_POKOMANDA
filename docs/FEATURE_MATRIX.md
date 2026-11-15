@@ -1,15 +1,17 @@
-# Матрица функций — 2026-11-13
+# Матрица функций — аудит 2026-11-15
+
+Источники 1.txt, 2.txt и 3.txt прочитаны полностью. Статусы сверены с кодом; ограничения приёмки — в [аудите](audit/INITIAL-REPOSITORY-REVIEW.md).
 
 ## Этап 3 — Squad, дети и XLSX (D15–D21)
 
 | Экран / действие | UI / источник | Persistence / API | Auth / scope | Тест | Статус |
 |---|---|---|---|---|---|
 | Список и карточка метаданных отряда | `frontend/src/Squads.tsx`, `ShiftDetail` | `GET /api/shifts/:id/squads`, `GET /api/shifts/:id/squads/:squadId`; Prisma schema без изменений | active + shift visibility; `squad.view_all` либо scoped `squad.view_own`; membership без permission не даёт доступ; скрытый detail 404 | backend integration, frontend, browser smoke | **готово этап 3, read-only** |
-| Количество, состав детей/сотрудников, Squad CRUD, DailyMark | будущие модули | не реализовано | отдельные object/field policies pending | нет | **схема / не входит в срез** |
-| Состав детей отряда | `frontend/src/Squads.tsx` | `GET /shifts/:id/squads/:squadId/children` | view scope отряда | backend integration + UI | **готово backend/UI** |
-| Создание CHILD | `Squads.tsx` | `POST .../children` | `squad.manage` в доступном отряде | integration | **готово backend/UI** |
-| Размещение/перевод CHILD | `Squads.tsx` | `PATCH .../children/:memberId` | `participants.edit_room`, same shift | integration/no-op | **готово backend/UI** |
-| XLSX preview/mapping/commit | `Squads.tsx` | `/children/import/*`, `ImportJob` | import + edit_room для обновлений; TTL | integration + parser security | **готово backend/UI** |
+| Количество, состав сотрудников, Squad CRUD, DailyMark | будущие модули | не реализовано | отдельные object/field policies pending | нет | **схема / не входит в срез** |
+| Состав детей отряда | `frontend/src/Squads.tsx` | `GET /shifts/:id/squads/:squadId/children` | view scope отряда | backend integration + UI | **backend/UI есть; приёмка детей не завершена** |
+| Создание CHILD | `Squads.tsx` | `POST .../children` | `squad.manage` в доступном отряде | integration | **backend/UI есть; приёмка детей не завершена** |
+| Размещение CHILD; перевод только API | `Squads.tsx` | `PATCH .../children/:memberId` | `participants.edit_room`, same shift | integration/no-op | **backend/UI есть; приёмка детей не завершена** |
+| XLSX preview/mapping/commit | `Squads.tsx` | `/children/import/*`, `ImportJob` | import + edit_room для обновлений; TTL | integration + parser security | **backend/UI есть; приёмка детей не завершена** |
 
 Статусы: **готово v1** = есть реальный UI → API → PostgreSQL, серверная auth/policy и тесты; **схема** = модель/решение заложены, use-case ещё не подключён; **прототип** = только `3.txt`, не production; **не начато**.
 
@@ -34,8 +36,8 @@
 
 | RBAC object/field checks | central domain policy + staffing service | admission/roles/notifications scope | active + visible + action/target | negative integration tests | **готово staffing, остальное не внедрено** |
 | Squad CRUD / управление | `3.txt` only | Squad schema; mutations отсутствуют | management policy pending; read-only метаданные реализованы отдельно выше | не реализован | **схема** |
-| Child/ped staff membership | `3.txt` only | SquadMember + DB identity CHECK | child без User, staff с User | migration CHECK integration | **схема** |
-| Rooms/payment/checkin | `3.txt` only | SquadMember fields; PARTIAL note CHECK | field-level permissions planned | DB constraint integration | **схема** |
+| Членство педсостава | только демо | SquadMember schema; API отсутствует | staff с User, отдельно от допуска и должности | DB constraint tests | **схема; дети реализованы выше** |
+| Оплата / заезд | только демо | SquadMember fields; PARTIAL note CHECK | отдельные полевые права | DB constraints | **схема; комнаты CHILD реализованы выше** |
 | DailyMark | `3.txt` only | unique member+date | setter scope planned | не реализован | **схема** |
 | BankEvent catalog | `3.txt` only | BankEvent schema | public/private policy planned | не реализован | **схема** |
 | BankEventFile upload/download | `3.txt` object/data URL | private metadata storage schema, scanStatus | protected signed/object storage endpoint pending | не реализован | **прототип + схема** |
@@ -44,7 +46,7 @@
 | Surveys / submission | `3.txt` answer upsert | SurveySubmission unique user+survey | audience / one atomic submission planned | не реализован | **схема** |
 | Documents | `3.txt` metadata only | UserDocument metadata | restricted DTO/policy pending | не реализован | **прототип + схема** |
 | Trainee/selection comments | `3.txt` in-memory | comments FK/index | ADMIN/LEAD + shift scope pending | не реализован | **прототип + схема** |
-| CSV/XLSX import | `3.txt` browser preview + CDN SheetJS | ImportJob preview/confirm schema | no FIO-only merge; backend parser pending | не реализован | **прототип + схема** |
+| CSV / смешанный импорт | только демо | production поддерживает отдельный XLSX CHILD | не объединять по ФИО | нет | **не реализовано; XLSX CHILD отдельно выше** |
 | Google Sheets | `3.txt` generates rows by ID | no real integration | OAuth/export backend pending | не реализован | **прототип** |
 | Telegram bot delivery | Outbox/Preference schema only | worker/webhook отсутствуют | никакой фиктивной доставки | нет | **не готово; in-app inbox готов отдельно** |
 | Audit | Staffing history UI + foundation | AuditLog transaction with mutation | current shift/own scope, minimal subject DTO | integration/browser | **готово foundation + staffing** |
@@ -57,7 +59,7 @@
 | Ручное принятие участника на смену | CandidateSearch | POST staff creates APPROVED Application | ADMIN, confirmed target, no bypass rejected | integration/browser | **готово этап 2** |
 | Открыть/закрыть набор отдельно | Recruitment | PATCH recruitment | ADMIN | integration/browser | **готово этап 2** |
 | Изменить этап / настройки / видимость | Staffing stage ready; остальные patch-settings не подключены | stage PATCH ready; visibility только при создании | ADMIN | stage integration/browser | **частично: этап готов, редактирование visibility/title/dates не готово** |
-| Мой отряд / поиск / фильтр типа | `ScreenMySquad`, `ScreenSquad` | membership schema, API нет | свой отряд, дети PII | нет | **прототип + схема** |
+| Мой отряд / поиск / фильтр типа | scoped список и карточка; отдельного экрана/фильтров нет | scoped GET отрядов/детей есть | view_own + связь | scope integration/browser метаданных | **частично** |
 | Мои отметки стажёра | `ScreenDailyMarks`, profile marks | DailyMark schema | own-only endpoint pending | нет | **схема** |
 | Программа: reorder/conflicts/ответственный | `ProgramBlock`, `ProgramItemModal` | ProgramItem + AuditLog | field rules / author changes pending | time CHECK DB only | **схема** |
 | Предложения изменений программы | `api.program.propose/resolveProposal` | ProgramProposal schema | creator/admin decision pending | нет | **схема** |
@@ -76,9 +78,11 @@
 
 ## Не перенесённые симуляции
 - `3.txt`: in-memory `store`, fake JWT, `delay`, seed users, client-side `need`, object URL uploads, generated `parseGoogleSheet`, fake bot chat.
-- Remote каркас `origin/main`: missing `bank.ts`/`users.ts`, empty routes, missing `KomandaApp`, undefined `app.authenticate`, BigInt DTO issue; не включён автоматически.
+- Упоминания сломанного remote-каркаса относятся к историческому состоянию 2026-11-11. Текущий origin/main содержит рабочий workspace.
 
 ## Риски и следующие вертикальные срезы
-Для первого среза проверены ключевые P0-контроли auth/session/visibility/onboarding; это не итоговый security sign-off. P1 remains: squads/members/daily marks → program/bank/files → surveys/tech → import/Google/bot. P2 remains: full navigation replacement for all demo screens, e2e each role/resource, deployment/backup/monitoring.
+Foundation и этап 2 работают. Этап 3 частичен: метаданные отрядов, CHILD и XLSX имеют реальный API/PostgreSQL, но полный пользовательский цикл ещё не принят. Squad CRUD, членство педсостава, оплата, заезд и DailyMark отсутствуют. Программа, банк, опросы, техзапросы, документы, комментарии, Google и Telegram delivery остаются будущими модулями.
 
-Честная граница: foundation и этап 2 (заявки, допуск, должности, история, in-app notifications) реализованы и проверены. Отряды/дети/оплата/комнаты/DailyMark, программа/банк, опросы/техзапросы, документы/комментарии, imports и Telegram delivery остаются следующими этапами. Withdrawal/пересмотр закрытых заявок не входят в согласованный этап 2.
+Проверки 2026-11-15: lint/typecheck/build PASS; 123 backend + 33 frontend tests PASS; browser smoke PASS для foundation/staffing/метаданных отрядов. Дети/XLSX не входят в browser smoke и текущие frontend-тесты отрядов.
+
+Доказательства дефектов — [аудит](audit/INITIAL-REPOSITORY-REVIEW.md). Предложенный порядок и приёмка — [план](IMPLEMENTATION-ROADMAP.md). Пересмотр закрытых заявок требует отдельного решения.

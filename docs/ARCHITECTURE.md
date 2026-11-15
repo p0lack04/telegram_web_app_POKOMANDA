@@ -1,6 +1,6 @@
 # Архитектурные решения и этапы
 
-Дата: 2026-11-11. Source of truth: полностью прочитанные 1.txt, 2.txt, 3.txt и CLAUDE.md. Исходный прототип сохраняется как неизменный источник сценариев, а не включается в production bundle.
+Дата: 2026-11-11. Source of truth: полностью прочитанные 1.txt, 2.txt, 3.txt и утверждённые решения владельца. Исходный прототип сохраняется как неизменный источник сценариев, а не включается в production bundle.
 
 ## ADR-001 — постепенные вертикальные срезы
 Используем существующее направление Fastify + TypeScript / React 18 + Vite + TanStack Query / Prisma + PostgreSQL, не создаём второй сервер. Рабочий tree не содержит remote-каркас; переносим необходимые идеи и доменные имена, но не заведомо сломанные entrypoints/фиктивные endpoints. Workspace backend/frontend, один lockfile. Слои routes → services/policies → Prisma. Общая runtime-валидация Zod на границе; DTO allowlists, единый error envelope. Неисполненные сценарии остаются в feature matrix, а не в виде фиктивных кнопок.
@@ -69,3 +69,6 @@ Production: HTTPS reverse proxy раздаёт frontend и /api с одного 
 
 ## UX
 Основная навигация: Главная / Смены / Банк / Опросы / Профиль; дополнительные Команда, База знаний, документы, уведомления через меню. Внутри смены: Этапы / Отряды / Программа / Техзапросы / Опросы. UI вводится по мере готовности API, не выдаёт отсутствие интеграции за успех. Mobile 320–430 px, Telegram theme/safe areas/back cleanup, labels/focus/44px touch targets, error/retry/empty/loading feedback и reduced motion.
+
+## Аудит реализации — 2026-11-15
+ADR-001–006 сохраняются без изменения бизнес-правил. После ADR-006 добавлен UI CHILD/XLSX, но его наличие не означает полной приёмки: форма необязательного отчества, отображение preview/result, обновление query и browser-покрытие требуют доработки. Результаты — в [аудите](audit/INITIAL-REPOSITORY-REVIEW.md), будущие срезы — в [плане](IMPLEMENTATION-ROADMAP.md).

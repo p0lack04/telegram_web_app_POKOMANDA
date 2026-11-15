@@ -3,7 +3,7 @@
 Дата: 2026-11-11. Ветка `feat/production-foundation`. Коммитов/push/deployment не выполнялось.
 
 ## Что прочитано и сохранено
-Полностью прочитаны CLAUDE.md, 1.txt, 2.txt, 3.txt, все 9 project skills, все 5 project agents и существующие audit/roadmap docs. Исходные TXT не редактировались. Локальный origin/main также проверен чтением: 24 файла, часть пустые/неполные. Рабочий main был unborn, поэтому `git diff` не показывает новые файлы — они untracked, не staged. Не выполнялись checkout/reset/merge удалённого каркаса.
+Полностью прочитаны локальные инструкции разработки, 1.txt, 2.txt, 3.txt, все 9 project skills, все 5 project agents и существующие audit/roadmap docs. Исходные TXT не редактировались. Локальный origin/main также проверен чтением: 24 файла, часть пустые/неполные. Рабочий main был unborn, поэтому `git diff` не показывает новые файлы — они untracked, не staged. Не выполнялись checkout/reset/merge удалённого каркаса.
 
 ## Аудит и план
 Добавлены `docs/audit/BASELINE.md`, `FEATURE-MATRIX.md`, `docs/architecture/DECISIONS.md`. Старые документы сохранены как исходные. Дополнительные требования 2.txt приняты как уточнения; опасные неоднозначности решены консервативно с явными допущениями (не самоназначать LEAD, не сливать ФИО, PARTIAL note, одно DailyMark/member/date, несколько отрядов разрешены).

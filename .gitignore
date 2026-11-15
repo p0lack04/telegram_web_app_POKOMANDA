@@ -6,11 +6,20 @@ dist/
 coverage/
 playwright-report/
 test-results/
-.claude/worktrees/
 uploads/
 *.log
 1.txt
 2.txt
 3.txt
-test-results/
-.claude/worktrees/
+*.graphify-bak
+# Local AI tooling and instructions (keep outside repository)
+.claude/
+.codex/
+.agents/
+AGENTS.md
+CLAUDE.md
+graphify-out/
+.local-agent-backup/
+docs/CODEX_SETUP.md
+docs/AI_GIT_WORKFLOW.md
+docs/GITHUB_PREPARATION.md
