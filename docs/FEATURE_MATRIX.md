@@ -92,3 +92,7 @@ Foundation Рё СЌС‚Р°Рї 2 СЂР°Р±РѕС‚Р°СЋС‚. РЎСЂРµР· 3Рђ РёСЃРїСЂР°РІР»СЏРµС‚ РґР
 - **3Б готово v1:** Squad CRUD, список/добавление/перевод/снятие педсостава, проверка APPROVED допуска, object/scope policies и audit.
 - **3В готово v1:** отдельные payment/check-in mutations, PARTIAL note invariant, DailyMark list/upsert с уникальностью member+date, field-level permissions и audit; UI педсостава отображает и меняет оплату/заезд.
 - PostgreSQL schema использована без изменения моделей; добавлена additive migration `202611150004_stage_3bc`.
+
+
+## Р­С‚Р°Рї 4 вЂ” СЃСЂРµР· 2026-11-15
+BankEvent catalog/search/create/update Рё ProgramItem CRUD СЃ server-side visibility, permission checks Рё audit вЂ” РіРѕС‚РѕРІРѕ v1. Protected file storage/download/delete, program reorder/conflicts Рё proposals/history вЂ” РЅРµ СЂРµР°Р»РёР·РѕРІР°РЅРѕ.
