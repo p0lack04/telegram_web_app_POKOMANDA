@@ -72,3 +72,6 @@ Baseline: npm.cmd run lint/typecheck/build вЂ” PASS; npm.cmd test вЂ” 123 backen
 - Добавлены отдельные mutation endpoints для paymentStatus/paymentNote и checkinStatus, включая обязательную непустую заметку для PARTIAL и field-level permissions. Добавлены DailyMark upsert/list с уникальностью member+date, scope и audit.
 - Frontend карточка отряда показывает педсостав и доступные действия оплаты/заезда с обновлением TanStack Query.
 - Проверки: `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build` — PASS; `npm.cmd test -- --run` запускается, но embedded PostgreSQL в sandbox завершается `uv_os_get_passwd ENOMEM`; frontend tests PASS.
+
+## 2026-11-15 вЂ” СЌС‚Р°Рї 4, РїРµСЂРІС‹Р№ СЃСЂРµР·
+Р”РѕР±Р°РІР»РµРЅС‹ backend routes РґР»СЏ BankEvent Рё ProgramItem, СЃРµСЂРІРµСЂРЅР°СЏ Р°РІС‚РѕСЂРёР·Р°С†РёСЏ/visibility/scope, Zod-РІР°Р»РёРґР°С†РёСЏ, С‚СЂР°РЅР·Р°РєС†РёРѕРЅРЅС‹Р№ AuditLog Рё UI РІРєР»Р°РґРєРё В«Р‘Р°РЅРєВ». РџСЂРѕРІРµСЂРєРё: lint, typecheck, build вЂ” PASS; frontend tests вЂ” 40 PASS; backend integration suites РЅРµ СЃС‚Р°СЂС‚СѓСЋС‚ РІ РѕРєСЂСѓР¶РµРЅРёРё РёР·-Р·Р° uv_os_get_passwd ENOMEM (РёР·РІРµСЃС‚РЅС‹Р№ РѕРіСЂР°РЅРёС‡РёС‚РµР»СЊ embedded PostgreSQL). Р¤Р°Р№Р»С‹ object storage, reorder/conflicts Рё proposals РѕСЃС‚Р°СЋС‚СЃСЏ РѕС‚РєСЂС‹С‚С‹РјРё.

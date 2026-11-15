@@ -10,6 +10,7 @@ import { registerStaffingRoutes } from './staffing.js';
 import { registerSquadRoutes } from './squads.js';
 import { registerChildrenRoutes } from './children.js';
 import { registerChildrenImportRoutes } from './children-import.js';
+import { registerProgramBankRoutes } from './program-bank.js';
 import type { Config } from '../config.js';
 
 export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthService,config:Config) {
@@ -22,6 +23,7 @@ export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthSe
  registerSquadRoutes(app,db,activeUser);
  registerChildrenRoutes(app,db,activeUser);
  registerChildrenImportRoutes(app,db,activeUser);
+ registerProgramBankRoutes(app,db,activeUser);
  const audit=(actor:User,action:string,entityType:string,entityId:string)=>({actorId:actor.id,action,entityType,entityId});
  app.get('/health',async()=>({status:'ok'}));
  app.post('/api/auth/telegram', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(request,reply)=>{
