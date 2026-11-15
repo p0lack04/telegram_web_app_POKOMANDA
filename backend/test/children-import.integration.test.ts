@@ -68,6 +68,13 @@ it('requires import permission and actor/job ownership and explicit confirmation
  const job=(await preview(importer,[headers,['Access','Test','2015-01-02','A']])).json();expect((await commit(roomer,job.jobId)).statusCode).toBe(404);
  expect((await send(importer,`${base()}/${job.jobId}/commit`,{revision:1,confirmed:false})).statusCode).toBe(400);
 });
+it('skips staff rows from a mixed workbook without creating child identities',async()=>{
+ const job=(await preview(importer,[[...headers,'Тип'],['MixedChild','Synthetic','2015-01-02','A','','','CHILD'],['MixedLead','Synthetic','2015-01-02','A','','','LEAD'],['MixedTrainee','Synthetic','2015-01-02','A','','','TRAINEE']])).json();
+ expect(job.rows.map((row:{category:string})=>row.category)).toEqual(['NEW','ERROR','ERROR']);
+ const done=(await commit(importer,job.jobId)).json();expect(done.result.counts).toEqual({CREATED:1,SKIPPED:2});
+ expect(done.result.rows[1].reasons).toContain('UNSUPPORTED_MEMBER_TYPE');
+ expect(await db.squadMember.count({where:{shiftId:shift,lastName:{in:['MixedLead','MixedTrainee']}}})).toBe(0);
+});
 it('partially creates, strips PII, repeats safely, requires single-candidate mapping, preserves blank placement and avoids UPDATE',async()=>{
  const response=await preview(importer,[headers,['Unique','Child','2015-01-02','A','B','12'],['Invalid','Child','01.02.15','A'],['Unknown','Child','2015-01-02','Foreign']]);expect(response.statusCode).toBe(201);const job=response.json();
  const done=await commit(importer,job.jobId);expect(done.statusCode).toBe(200);expect(done.json().result.counts).toEqual({CREATED:1,SKIPPED:2});const id=done.json().result.rows[0].memberId;
@@ -120,4 +127,16 @@ it('serializes same-job and cross-job commit, skips stale snapshot, rejects expi
  const input=[headers,['Concurrent','Test','2015-01-02','A']];const j1=(await preview(importer,input)).json(),j2=(await preview(importer,input)).json();const results=await Promise.all([commit(importer,j1.jobId),commit(importer,j1.jobId),commit(importer,j2.jobId)]);expect(results.every(r=>r.statusCode===200)).toBe(true);expect(await db.squadMember.count({where:{shiftId:shift,lastName:'Concurrent'}})).toBe(1);
  const member=await db.squadMember.findFirstOrThrow({where:{shiftId:shift,lastName:'Concurrent'}});const stale=(await preview(roomer,[headers,['Concurrent','Test','2015-01-02','A','New','123']])).json();await mapping(roomer,stale.jobId,member.id);await db.squadMember.update({where:{id:member.id},data:{room:'UnseenChange'}});expect((await commit(roomer,stale.jobId,2)).json().result.rows[0].reasons).toContain('DATA_CHANGED');
  const expired=(await preview(importer,[headers,['Expired','Test','2015-01-02','A']])).json();await db.importJob.update({where:{id:expired.jobId},data:{expiresAt:new Date(Date.now()-1000)}});expect((await commit(importer,expired.jobId)).statusCode).toBe(410);await cleanupChildPreviews(db);const cleaned=await db.importJob.findUniqueOrThrow({where:{id:expired.jobId}});expect(cleaned.status).toBe('EXPIRED');expect(cleaned.preview).toEqual({reason:'PREVIEW_EXPIRED'});
+});
+it('rejects stale revisions and rechecks revoked import permission before commit',async()=>{
+ const job=(await preview(roomer,[headers,['Revision','Synthetic','2015-01-02','A']])).json();
+ const mapped=await send(roomer,`${base()}/${job.jobId}/mapping`,{revision:1,choices:[{rowNumber:2,action:'skip'}]});
+ expect(mapped.statusCode).toBe(200);
+ const stale=await commit(roomer,job.jobId,1);expect(stale.statusCode).toBe(409);expect(stale.json().error.code).toBe('STALE_REVISION');
+ const role=await db.shiftRole.findFirstOrThrow({where:{userId:roomer.id,shiftId:shift}});
+ try {
+  await db.shiftRole.delete({where:{id:role.id}});
+  expect((await commit(roomer,job.jobId,2)).statusCode).toBe(403);
+  expect(await db.squadMember.count({where:{shiftId:shift,lastName:'Revision'}})).toBe(0);
+ } finally {await db.shiftRole.create({data:role});}
 });

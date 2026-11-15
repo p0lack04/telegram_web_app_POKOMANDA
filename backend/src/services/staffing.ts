@@ -4,6 +4,7 @@ import { requireRule } from '../errors.js';
 import { active, canSeeShift, permissions, requireActive, requireAdmin, visibleShiftWhere, ROLE_PERMISSIONS } from '../domain/permissions.js';
 import { applicationTypeFor, requireKnownPosition, staffingActions } from '../domain/staffing.js';
 import { applicationDecisionSchema, positionSchema, recruitmentSchema } from '../domain/schemas.js';
+import { shiftDto } from './dto.js';
 
 type Tx=Prisma.TransactionClient;
 const summary={id:true,firstName:true,lastName:true,middleName:true,role:true} as const;
@@ -79,7 +80,7 @@ export class StaffingService {
    requireAdmin(actor);
    const updated=await tx.shift.update({where:{id:shiftId},data:body});
    await this.record(tx,actor,shift,'RECRUITMENT_UPDATED','Shift',shiftId,{before:{leadRecruitOpen:shift.leadRecruitOpen,traineeRecruitOpen:shift.traineeRecruitOpen,stage:shift.stage},after:body});
-   return {shift:updated};
+   return {shift:shiftDto(updated)};
   });
  }
  async candidates(actorId:string,shiftId:string,search:string,page:number,pageSize:number) {

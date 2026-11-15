@@ -4,6 +4,8 @@
 
 `participants.import` разрешает загрузку и создание preview в видимой смене и доступных отрядах. `participants.edit_room` разрешает ручное изменение `squadId/building/room`; обновление существующих строк XLSX требует обоих разрешений. Ручное создание CHILD требует `squad.manage`. ФИО, дата рождения, `memberType` и `userId` после создания не изменяются. Сначала проверяются active account, видимость смены и object scope, затем permission.
 
+Список детей возвращает `capabilities: {create, editPlacement, import}` для текущего пользователя. `create` дополнительно учитывает management scope: `view_all` не расширяет локальное управление. UI скрывает недоступные действия, а каждый mutation повторно проверяет серверные права. Перевод выбирается из доступных отрядов этой смены; сервер проверяет обе стороны перевода.
+
 ## Squad read-only (этап 3, D1/D2/D3/D14/D12 APPROVED — 2026-11-13)
 
 Порядок проверок: active account → visibility смены → итоговый permission set → object scope. `squad.view_all` разрешает все отряды конкретной доступной смены. Иначе `squad.view_own` разрешает только отряды со связью через `ShiftRole.squadId` либо `SquadMember.userId` при совпадении user/shift/squad. Источники объединяются; null squadId не является связью. Membership само по себе permissions не создаёт. Несколько членств одной смены допустимы, но не повышают права до `view_all`. `squad.manage` не заменяет права просмотра.

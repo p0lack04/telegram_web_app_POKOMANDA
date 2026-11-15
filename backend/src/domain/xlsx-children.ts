@@ -76,6 +76,8 @@ export async function parseChildrenXlsx(buffer:Buffer):Promise<ImportRow[]>{
   const row=matrix[i]!;if(row.every(v=>v===null||v===''))continue;
   const get=(header:string)=>row[headers.indexOf(header)];
   const errors:string[]=[],warnings:string[]=[];
+  const memberType=text(get('тип')).toUpperCase();
+  if(memberType && memberType!=='CHILD')errors.push('UNSUPPORTED_MEMBER_TYPE');
   const firstName=text(get('имя')),lastName=text(get('фамилия')),middleName=text(get('отчество'))||null,squadName=text(get('отряд')),birthDate=date(get('дата рождения'));
   if(!firstName||!lastName)errors.push('NAME_REQUIRED');
   if(!birthDate)errors.push('INVALID_BIRTH_DATE');

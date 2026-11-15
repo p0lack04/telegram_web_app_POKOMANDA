@@ -3,6 +3,10 @@ import {parseChildrenXlsx} from '../src/domain/xlsx-children.js';
 import {testWorkbook} from './xlsx-fixture.js';
 const headers=['Фамилия','Имя','Дата рождения','Отряд'];
 describe('bounded XLSX parser',()=>{
+ it('marks staff and unknown member types as errors in mixed workbooks',async()=>{
+  const rows=await parseChildrenXlsx(testWorkbook([[...headers,'Тип'],...['CHILD','LEAD','TRAINEE','UNKNOWN',''].map(type=>['Test','Synthetic','2015-01-02','A',type])]));
+  expect(rows.map(row=>row.errors)).toEqual([[],['UNSUPPORTED_MEMBER_TYPE'],['UNSUPPORTED_MEMBER_TYPE'],['UNSUPPORTED_MEMBER_TYPE'],[]]);
+ });
  it('supports exact dates, optional cells and ignored fields',async()=>{
   const rows=await parseChildrenXlsx(testWorkbook([[...headers,'Корпус','Комната','Оплата'],['Тестов','Тест','02.01.2015','A','','12','да'],['Другой','Тест','2015-01-02','A',null,null,null]]));
   expect(rows[0]).toMatchObject({birthDate:'2015-01-02',building:null,room:'12',warnings:['PAYMENT_CHECKIN_IGNORED']});expect(rows[1]!.errors).toEqual([]);

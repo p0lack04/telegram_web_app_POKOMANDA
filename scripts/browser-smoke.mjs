@@ -9,6 +9,9 @@ import { join, resolve } from 'node:path';
 import { randomBytes, createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { buildApp } from '../backend/dist/app.js';
+import { tsImport } from 'tsx/esm/api';
+
+const {testWorkbook}=await tsImport('../backend/test/xlsx-fixture.ts',import.meta.url);
 
 // Только синтетические fixtures в отдельной временной PostgreSQL. Ни dev-login,
 // ни подмена HTTP не добавляются в приложение; браузер работает с реальным API.
@@ -156,6 +159,75 @@ try {
  await admin.page.setViewportSize({width:320,height:740});
  await admin.page.screenshot({path:'test-results/squad-detail-320.png',fullPage:true});
  expect(await admin.page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ // Дети: реальная запись, расселение и перевод через UI, без отчества.
+ await restartApi();
+ await admin.page.getByRole('button',{name:'+ Добавить',exact:true}).click();
+ await admin.page.getByLabel('Фамилия *',{exact:true}).fill('Проверкин');
+ await admin.page.getByLabel('Имя *',{exact:true}).fill('Ребёнок');
+ await admin.page.getByLabel('Дата рождения *',{exact:true}).fill('2015-01-02');
+ await admin.page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect(admin.page.getByRole('heading',{name:'Проверкин Ребёнок',exact:true})).toBeVisible();
+ const child=await db.squadMember.findFirstOrThrow({where:{shiftId:squadShift.id,lastName:'Проверкин',memberType:'CHILD'}});
+ expect(child.middleName).toBeNull();expect(child.userId).toBeNull();
+ await admin.page.getByRole('button',{name:'Изменить размещение',exact:true}).click();
+ await admin.page.getByLabel('Корпус',{exact:true}).fill('А');
+ await admin.page.getByLabel('Комната',{exact:true}).fill('12');
+ await admin.page.locator('select[name="squadId"]').selectOption(secondSquad.id);
+ await admin.page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect.poll(async()=>{const saved=await db.squadMember.findUniqueOrThrow({where:{id:child.id}});return [saved.squadId,saved.building,saved.room];}).toEqual([secondSquad.id,'А','12']);
+ await expect(admin.page.getByRole('heading',{name:'Проверкин Ребёнок',exact:true})).toHaveCount(0);
+ await admin.page.getByRole('button',{name:'← К отрядам',exact:true}).click();
+ await admin.page.getByRole('button',{name:'Южный',exact:true}).click();
+ await expect(admin.page.getByRole('heading',{name:'Проверкин Ребёнок',exact:true})).toBeVisible();
+ await admin.page.getByRole('button',{name:'← К отрядам',exact:true}).click();
+ await admin.page.getByRole('button',{name:'Северный',exact:true}).click();
+ // Preview обязан показывать и валидные строки, и ошибки; mapping показывает before/after.
+ const importHeaders=['Фамилия','Имя','Дата рождения','Отряд','Корпус','Комната'];
+ const importFile=rows=>({name:'synthetic-children.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:testWorkbook([importHeaders,...rows])});
+ const uploadPreview=async rows=>{
+  const response=admin.page.waitForResponse(r=>r.url().endsWith('/children/import/preview')&&r.request().method()==='POST');
+  await admin.page.getByLabel('Файл XLSX',{exact:true}).setInputFiles(importFile(rows));
+  const result=await response;expect(result.status()).toBe(201);return result.json();
+ };
+ const preview=await uploadPreview([
+  ['Проверкин','Ребёнок','2015-01-02','Северный','Б','23'],
+  ['Новиков','Импорт','2016-03-04','Северный','В','34'],
+  ['Ошибкин','Строка','не дата','Северный','',''],
+ ]);
+ const previewTable=admin.page.getByRole('table',{name:'Предпросмотр импорта'});
+ await expect(previewTable.getByRole('row')).toHaveCount(4);
+ await expect(previewTable).toContainText('Новиков');await expect(previewTable).toContainText('Ошибкин');
+ await admin.page.getByLabel('Сопоставление строки 2',{exact:true}).selectOption(child.id);
+ await expect(previewTable.getByRole('row').filter({hasText:'Проверкин'})).toContainText('12');
+ await expect(previewTable.getByRole('row').filter({hasText:'Проверкин'})).toContainText('23');
+ await admin.page.screenshot({path:'test-results/children-preview-light-320.png',fullPage:true});
+ expect(await admin.page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await admin.page.getByRole('button',{name:'Подтвердить импорт',exact:true}).click();
+ const importResult=admin.page.getByRole('region',{name:'Результат импорта'});
+ await expect(importResult).toContainText('Импорт завершён');
+ await expect(importResult).toContainText('INVALID_BIRTH_DATE');
+ await expect(admin.page.getByRole('heading',{name:'Новиков Импорт',exact:true})).toBeVisible();
+ await expect(admin.page.getByRole('heading',{name:'Проверкин Ребёнок',exact:true})).toBeVisible();
+ expect(await db.squadMember.count({where:{shiftId:squadShift.id,memberType:'CHILD'}})).toBe(2);
+ const committed=await db.importJob.findUniqueOrThrow({where:{id:preview.jobId}});
+ expect(committed.preview.counts).toEqual({UPDATED:1,CREATED:1,SKIPPED:1});
+ const repeat=await admin.context.request.post(`${origin}/api/shifts/${squadShift.id}/children/import/${preview.jobId}/commit`,{headers:{origin},data:{revision:2,confirmed:true}});
+ expect(repeat.status()).toBe(200);expect((await repeat.json()).result.counts).toEqual(committed.preview.counts);
+ expect(await db.squadMember.count({where:{shiftId:squadShift.id,memberType:'CHILD'}})).toBe(2);
+ // Истёкшее подтверждение не пишет данные; новый файл позволяет повторить действие.
+ const retryRows=[['Повторкин','Импорт','2016-03-04','Северный','','']];
+ const expired=await uploadPreview(retryRows);
+ await db.importJob.update({where:{id:expired.jobId},data:{expiresAt:new Date(Date.now()-1000)}});
+ await admin.page.getByRole('button',{name:'Подтвердить импорт',exact:true}).click();
+ await expect(admin.page.getByRole('alert')).toContainText('Предпросмотр истёк');
+ expect(await db.squadMember.count({where:{shiftId:squadShift.id,lastName:'Повторкин'}})).toBe(0);
+ await uploadPreview(retryRows);
+ await admin.page.getByRole('button',{name:'Подтвердить импорт',exact:true}).click();
+ await expect(admin.page.getByRole('heading',{name:'Повторкин Импорт',exact:true})).toBeVisible();
+ await admin.page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});
+ await admin.page.screenshot({path:'test-results/children-result-dark-320.png',fullPage:true});
+ expect(await admin.page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await restartApi();
  await lead.page.reload();await openShift(lead.page);
  const ownSquads=panel(lead.page,'Отряды');
  await expect(ownSquads.getByRole('button',{name:'Северный',exact:true})).toBeVisible();
@@ -164,6 +236,9 @@ try {
  await ownSquads.getByRole('button',{name:'Южный',exact:true}).focus();
  await lead.page.keyboard.press('Enter');
  await expect(lead.page.getByRole('heading',{name:'Южный',exact:true})).toBeVisible();
+ await expect(lead.page.getByRole('button',{name:'+ Добавить',exact:true})).toHaveCount(0);
+ await expect(lead.page.getByRole('button',{name:'Изменить размещение',exact:true})).toHaveCount(0);
+ await expect(lead.page.getByLabel('Файл XLSX',{exact:true})).toHaveCount(0);
  await lead.page.screenshot({path:'test-results/squad-own-dark-mobile.png',fullPage:true});
  await lead.page.getByRole('button',{name:'← К отрядам',exact:true}).click();
  await expect(ownSquads.getByRole('button',{name:'Южный',exact:true})).toBeVisible();
@@ -199,7 +274,7 @@ try {
  await guestPage.screenshot({path:'test-results/guest-320.png',fullPage:true});
  for(const page of [admin.page,trainee.page,lead.page,pending.page,guestPage]) expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  expect(errors).toEqual([]);
- console.info('Browser smoke passed: foundation + staffing apply/approve/reject/manual admission/assign/remove, own lists/history/inbox/read, deputy authority; Squad list/detail, union role+membership, direct 404, permission denied, empty, revoked-access cache hiding + retry, keyboard/back navigation, PostgreSQL, light/dark/mobile; no overflow/page errors or React warnings.');
+ console.info('Browser smoke passed: foundation + staffing apply/approve/reject/manual admission/assign/remove, own lists/history/inbox/read, deputy authority; Squad list/detail, union role+membership, direct 404, permission denied, empty, revoked-access cache hiding + retry; child create without middle name, placement/transfer, XLSX full preview/mapping/partial result/cache refresh/idempotent commit/expiry/retry, read-only controls; keyboard/back navigation, PostgreSQL, light/dark/mobile/reduced motion; no overflow/page errors or React warnings.');
 } catch(error) {
  if(browser) for(const [i,context] of browser.contexts().entries()) for(const page of context.pages()) {await page.screenshot({path:`test-results/failure-${i}.png`,fullPage:true}).catch(()=>{});console.error('Browser page',i,(await page.locator('body').innerText()).slice(-5000));}
  throw error;

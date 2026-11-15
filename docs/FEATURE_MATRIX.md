@@ -8,10 +8,10 @@
 |---|---|---|---|---|---|
 | Список и карточка метаданных отряда | `frontend/src/Squads.tsx`, `ShiftDetail` | `GET /api/shifts/:id/squads`, `GET /api/shifts/:id/squads/:squadId`; Prisma schema без изменений | active + shift visibility; `squad.view_all` либо scoped `squad.view_own`; membership без permission не даёт доступ; скрытый detail 404 | backend integration, frontend, browser smoke | **готово этап 3, read-only** |
 | Количество, состав сотрудников, Squad CRUD, DailyMark | будущие модули | не реализовано | отдельные object/field policies pending | нет | **схема / не входит в срез** |
-| Состав детей отряда | `frontend/src/Squads.tsx` | `GET /shifts/:id/squads/:squadId/children` | view scope отряда | backend integration + UI | **backend/UI есть; приёмка детей не завершена** |
-| Создание CHILD | `Squads.tsx` | `POST .../children` | `squad.manage` в доступном отряде | integration | **backend/UI есть; приёмка детей не завершена** |
-| Размещение CHILD; перевод только API | `Squads.tsx` | `PATCH .../children/:memberId` | `participants.edit_room`, same shift | integration/no-op | **backend/UI есть; приёмка детей не завершена** |
-| XLSX preview/mapping/commit | `Squads.tsx` | `/children/import/*`, `ImportJob` | import + edit_room для обновлений; TTL | integration + parser security | **backend/UI есть; приёмка детей не завершена** |
+| Состав детей отряда | `frontend/src/Squads.tsx` | `GET /shifts/:id/squads/:squadId/children` | view scope отряда, capabilities | backend integration + browser | **срез 3А реализован** |
+| Создание CHILD | `Squads.tsx` | `POST .../children` | `squad.manage` в доступном отряде | integration + browser без отчества | **срез 3А реализован** |
+| Размещение и перевод CHILD | `Squads.tsx` | `PATCH .../children/:memberId` | `participants.edit_room`, same shift | integration/no-op + browser | **срез 3А реализован** |
+| XLSX preview/mapping/commit | `ChildrenImport.tsx` | `/children/import/*`, `ImportJob` | import + edit_room для обновлений; TTL | integration + parser security + frontend/browser | **срез 3А реализован** |
 
 Статусы: **готово v1** = есть реальный UI → API → PostgreSQL, серверная auth/policy и тесты; **схема** = модель/решение заложены, use-case ещё не подключён; **прототип** = только `3.txt`, не production; **не начато**.
 
@@ -81,8 +81,8 @@
 - Упоминания сломанного remote-каркаса относятся к историческому состоянию 2026-11-11. Текущий origin/main содержит рабочий workspace.
 
 ## Риски и следующие вертикальные срезы
-Foundation и этап 2 работают. Этап 3 частичен: метаданные отрядов, CHILD и XLSX имеют реальный API/PostgreSQL, но полный пользовательский цикл ещё не принят. Squad CRUD, членство педсостава, оплата, заезд и DailyMark отсутствуют. Программа, банк, опросы, техзапросы, документы, комментарии, Google и Telegram delivery остаются будущими модулями.
+Foundation и этап 2 работают. Срез 3А исправляет детский UI/XLSX и добавляет полный пользовательский цикл поверх API/PostgreSQL. Этап 3 частичен: Squad CRUD, членство педсостава, оплата, заезд и DailyMark отсутствуют. Программа, банк, опросы, техзапросы, документы, комментарии, Google и Telegram delivery остаются будущими модулями.
 
-Проверки 2026-11-15: lint/typecheck/build PASS; 123 backend + 33 frontend tests PASS; browser smoke PASS для foundation/staffing/метаданных отрядов. Дети/XLSX не входят в browser smoke и текущие frontend-тесты отрядов.
+Проверки среза 3А: 127 backend + 40 frontend tests PASS. Browser smoke расширен детьми/XLSX; окончательные результаты lint/typecheck/build/browser и ограничения — в [журнале](DEVELOPMENT_LOG.md).
 
 Доказательства дефектов — [аудит](audit/INITIAL-REPOSITORY-REVIEW.md). Предложенный порядок и приёмка — [план](IMPLEMENTATION-ROADMAP.md). Пересмотр закрытых заявок требует отдельного решения.

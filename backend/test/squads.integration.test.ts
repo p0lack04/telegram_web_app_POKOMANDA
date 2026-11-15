@@ -83,12 +83,16 @@ describe('child endpoints',()=>{
   await db.shiftRole.create({data:{userId:all.id,shiftId:shift,position:'Ведущий отряда',squadId:a}});
   const payload={firstName:'Scope',lastName:'Synthetic',birthDate:'2015-01-02'};
   expect((await post(all,payload)).statusCode).toBe(201);
+  expect((await get(all,url())).json().capabilities).toEqual({create:true,editPlacement:false,import:false});
+  expect((await get(all,`/api/shifts/${shift}/squads/${d}/children`)).json().capabilities).toEqual({create:false,editPlacement:false,import:false});
   expect((await get(all,`/api/shifts/${shift}/squads/${d}`)).statusCode).toBe(200);
   expect((await app.inject({method:'POST',url:`/api/shifts/${shift}/squads/${d}/children`,headers:{cookie:cookies.get(all.id)!,origin},payload})).statusCode).toBe(404);
  });
  it('checks management scope and immutable identity',async()=>{
   const payload={firstName:'Имя',lastName:'Фамилия',birthDate:'2015-01-02'};
   expect((await post(own,payload)).statusCode).toBe(403);
+  expect((await get(own,url())).json().capabilities).toEqual({create:false,editPlacement:false,import:false});
+  expect((await get(admin,url())).json().capabilities).toEqual({create:true,editPlacement:true,import:true});
   expect((await post(admin,{...payload,userId:admin.id})).statusCode).toBe(400);
   const created=await post(admin,payload);expect(created.statusCode).toBe(201);
   const id=created.json().member.id as string;

@@ -54,6 +54,17 @@ describe('реальный PostgreSQL + HTTP',()=>{
   for(const cookie of [traineeCookie,leadCookie]){const list=await app.inject({url:'/api/shifts',headers:headers(cookie)});expect(list.json().items.map((s:{id:string})=>s.id)).not.toContain(hiddenId);expect((await app.inject({url:'/api/shifts/'+hiddenId,headers:headers(cookie)})).statusCode).toBe(404);}
  });
  it('отдаёт доступную смену',async()=>expect((await app.inject({url:'/api/shifts/'+sharedId,headers:headers(traineeCookie)})).statusCode).toBe(200));
+ it('uses an exact public Shift allowlist for list, detail, create and recruitment',async()=>{
+  await db.shift.update({where:{id:sharedId},data:{googleSheetId:'internal-integration-id'}});
+  const keys=['id','title','description','startDate','endDate','timeZone','visibility','stage','leadRecruitOpen','traineeRecruitOpen'].sort();
+  const list=await app.inject({url:'/api/shifts',headers:headers(traineeCookie)});
+  for(const shift of list.json().items)expect(Object.keys(shift).sort()).toEqual(keys);
+  const detail=await app.inject({url:'/api/shifts/'+sharedId,headers:headers(traineeCookie)});
+  const created=await app.inject({method:'POST',url:'/api/shifts',headers:headers(adminCookie),payload:{title:'DTO fixture',startDate:'2027-01-01',endDate:'2027-01-02'}});
+  const recruitment=await app.inject({method:'PATCH',url:`/api/shifts/${sharedId}/recruitment`,headers:headers(adminCookie),payload:{leadRecruitOpen:true}});
+  expect([detail.statusCode,created.statusCode,recruitment.statusCode]).toEqual([200,201,200]);
+  for(const result of [detail,created,recruitment])expect(Object.keys(result.json().shift).sort()).toEqual(keys);
+ });
  it('не позволяет стажёру создавать смену',async()=>expect((await app.inject({method:'POST',url:'/api/shifts',headers:headers(traineeCookie),payload:{title:'Запрет',startDate:'2027-01-01',endDate:'2027-01-02'}})).statusCode).toBe(403));
  it('создаёт смену и аудит в транзакции',async()=>{const response=await app.inject({method:'POST',url:'/api/shifts',headers:headers(adminCookie),payload:{title:'Новая',startDate:'2027-01-01',endDate:'2027-01-02'}});expect(response.statusCode).toBe(201);expect(await db.auditLog.count({where:{entityId:response.json().shift.id}})).toBe(1);});
  it('отклоняет cross-origin POST',async()=>expect((await app.inject({method:'POST',url:'/api/shifts',headers:{cookie:adminCookie,origin:'https://evil.example'},payload:{}})).statusCode).toBe(403));

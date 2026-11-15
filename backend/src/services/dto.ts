@@ -1,4 +1,10 @@
-import type { User, Squad } from '@prisma/client';
+import type { User, Squad, Shift } from '@prisma/client';
+
+/** Публичные данные смены без внутренних настроек интеграций. */
+export function shiftDto(shift:Shift) {
+ return {id:shift.id,title:shift.title,description:shift.description,startDate:shift.startDate,endDate:shift.endDate,
+ visibility:shift.visibility,stage:shift.stage,leadRecruitOpen:shift.leadRecruitOpen,traineeRecruitOpen:shift.traineeRecruitOpen,timeZone:shift.timeZone};
+}
 
 /** Явный DTO: BigInt, служебные ID подтверждения и связи не уходят в JSON. */
 export function selfDto(user:User) {

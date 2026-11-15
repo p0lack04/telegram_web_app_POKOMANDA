@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { onboardingSchema, shiftSchema, pagination, idParam } from '../domain/schemas.js';
 import { requireActive, requireAdmin, visibleShiftWhere } from '../domain/permissions.js';
 import { requireRule } from '../errors.js';
-import { selfDto } from '../services/dto.js';
+import { selfDto, shiftDto } from '../services/dto.js';
 import type { AuthService } from '../services/auth.js';
 import { registerStaffingRoutes } from './staffing.js';
 import { registerSquadRoutes } from './squads.js';
@@ -87,12 +87,12 @@ export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthSe
   const actor=await activeUser(request); const {page,pageSize,upcoming}=pagination.extend({upcoming:z.literal('true').optional()}).parse(request.query);
   const where={...visibleShiftWhere(actor),...(upcoming?{endDate:{gte:new Date(new Date().toISOString().slice(0,10)+'T00:00:00Z')}}:{})};
   const [items,total]=await db.$transaction([db.shift.findMany({where,orderBy:[{startDate:upcoming?'asc':'desc'},{id:'asc'}],take:pageSize,skip:(page-1)*pageSize}),db.shift.count({where})]);
-  return {items,total,page,pageSize};
+  return {items:items.map(shiftDto),total,page,pageSize};
  });
  app.get('/api/shifts/:id',async(request)=>{
   const actor=await activeUser(request);const {id}=idParam.parse(request.params);
   const shift=await db.shift.findFirst({where:{id,...visibleShiftWhere(actor)}});
-  requireRule(shift,404,'NOT_FOUND','Смена не найдена');return {shift};
+  requireRule(shift,404,'NOT_FOUND','Смена не найдена');return {shift:shiftDto(shift)};
  });
  app.post('/api/shifts',async(request,reply)=>{
   const actor=await admin(request);const body=shiftSchema.parse(request.body);
@@ -100,6 +100,6 @@ export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthSe
    const shift=await tx.shift.create({data:{...body,startDate:new Date(body.startDate+'T00:00:00Z'),endDate:new Date(body.endDate+'T00:00:00Z')}});
    await tx.auditLog.create({data:audit(actor,'CREATE','Shift',shift.id)});return shift;
   });
-  reply.code(201);return {shift};
+  reply.code(201);return {shift:shiftDto(shift)};
  });
 }

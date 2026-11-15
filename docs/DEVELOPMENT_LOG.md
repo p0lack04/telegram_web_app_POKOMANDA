@@ -60,3 +60,8 @@
 Полностью изучены неизменённые 1.txt/2.txt/3.txt; существующий Graphify использован для навигации, выводы сверены с кодом. Обновлены матрица, контекст, аудит и предлагаемые этапы. Новые бизнес-правила не утверждались, приложение/схема/миграции не менялись.
 
 Baseline: npm.cmd run lint/typecheck/build — PASS; npm.cmd test — 123 backend + 33 frontend PASS; npm.cmd run test:browser — PASS (foundation, staffing, метаданные отрядов; без сценариев детей/XLSX). Embedded PostgreSQL требует запуска вне sandbox: внутри uv_os_get_passwd ENOMEM. Миграции применены тестовыми раннерами на временной PostgreSQL. Проверка childCreateSchema подтвердила: отсутствие middleName допускается, пустая строка из формы отвергается. Production Telegram, staging, backup/restore и нагрузка не проверены. Graphify не перестраивался: исходники приложения не менялись; старый граф может содержать ссылки на удалённые инструкции.
+
+## 2026-11-15 — приёмка среза 3А
+- Исправлен browser smoke-сценарий перевода ребёнка: выбор отряда использует стабильный `select[name="squadId"]`, сценарий больше не зависит от неоднозначной label.
+- Полные проверки вне sandbox: `npm.cmd test -- --run` — 127 backend + 40 frontend PASS; `npm.cmd run test:browser` — PASS (дети, размещение/перевод, XLSX preview/mapping/partial commit/idempotency/TTL/retry, права read-only, mobile/dark/reduced motion).
+- `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build` — PASS. Срез 3А принят; 3Б (Squad CRUD и членство педсостава) остаётся следующим этапом после согласования lifecycle.

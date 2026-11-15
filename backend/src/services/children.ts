@@ -18,17 +18,18 @@ export class ChildrenService {
   const managedScope:Prisma.SquadWhereInput=globalManagement?{shiftId}:{shiftId,OR:[{members:{some:{userId:actorId,shiftId}}},{roles:{some:{userId:actorId,shiftId}}}]};
   const scope=management?managedScope:squadScope(granted,actorId,shiftId);
   requireRule(scope && await tx.squad.findFirst({where:{...scope,id:squadId},select:{id:true}}),404,'NOT_FOUND','Отряд не найден');
-  return granted;
+  return {granted,managedScope};
  }
  private async locked<T>(shiftId:string,fn:(tx:Tx)=>Promise<T>) {
   return this.db.$transaction(async tx=>{await tx.$queryRaw`SELECT "id" FROM "Shift" WHERE "id" = ${shiftId} FOR UPDATE`;return fn(tx);});
  }
   async list(actorId:string,shiftId:string,squadId:string,page:number,pageSize:number) {
   return this.db.$transaction(async tx=>{
-   await this.scope(tx,actorId,shiftId,squadId);
+   const {granted,managedScope}=await this.scope(tx,actorId,shiftId,squadId);
    const where={shiftId,squadId,memberType:'CHILD' as const};
    const items=await tx.squadMember.findMany({where,select,orderBy:[{lastName:'asc'},{firstName:'asc'},{id:'asc'}],skip:(page-1)*pageSize,take:pageSize});
-   return {items,total:await tx.squadMember.count({where}),page,pageSize};
+   const capabilities={create:granted.has('squad.manage')&&Boolean(await tx.squad.findFirst({where:{...managedScope,id:squadId},select:{id:true}})),editPlacement:granted.has('participants.edit_room'),import:granted.has('participants.import')};
+   return {items,total:await tx.squadMember.count({where}),page,pageSize,capabilities};
   });
   }
   async listShift(actorId:string,shiftId:string,page:number,pageSize:number) {
@@ -51,14 +52,14 @@ export class ChildrenService {
  }
  async create(actorId:string,shiftId:string,squadId:string,body:z.infer<typeof childCreateSchema>) {
   return this.locked(shiftId,async tx=>{
-   const granted=await this.scope(tx,actorId,shiftId,squadId,true);requireRule(granted.has('squad.manage'),403,'FORBIDDEN','Управление отрядом недоступно');
+   const {granted}=await this.scope(tx,actorId,shiftId,squadId,true);requireRule(granted.has('squad.manage'),403,'FORBIDDEN','Управление отрядом недоступно');
    const member=await tx.squadMember.create({data:{shiftId,squadId,memberType:'CHILD',firstName:body.firstName,lastName:body.lastName,middleName:body.middleName??null,birthDate:new Date(body.birthDate+'T00:00:00Z')},select});
    await tx.auditLog.create({data:{actorId,shiftId,action:'CHILD_CREATED',entityType:'SquadMember',entityId:member.id}});return {member};
   });
  }
  async placement(actorId:string,shiftId:string,squadId:string,memberId:string,body:z.infer<typeof childPlacementSchema>) {
   return this.locked(shiftId,async tx=>{
-   const granted=await this.scope(tx,actorId,shiftId,squadId);requireRule(granted.has('participants.edit_room'),403,'FORBIDDEN','Редактирование расселения недоступно');
+   const {granted}=await this.scope(tx,actorId,shiftId,squadId);requireRule(granted.has('participants.edit_room'),403,'FORBIDDEN','Редактирование расселения недоступно');
    const member=await tx.squadMember.findFirst({where:{id:memberId,shiftId,squadId,memberType:'CHILD'},select});requireRule(member,404,'NOT_FOUND','Участник не найден');
    if(body.squadId)await this.scope(tx,actorId,shiftId,body.squadId);
    const data={...(body.squadId!==undefined&&body.squadId!==member.squadId?{squadId:body.squadId}:{}),...(body.building!==undefined&&body.building!==member.building?{building:body.building}:{}),...(body.room!==undefined&&body.room!==member.room?{room:body.room}:{})};
