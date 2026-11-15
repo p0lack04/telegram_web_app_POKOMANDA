@@ -105,3 +105,7 @@ Baseline: npm.cmd run lint/typecheck/build — PASS; npm.cmd test — 123 backen
 Исправлены повреждённые пользовательские строки состояния педсостава в frontend/src/Squads.tsx; массовая перекодировка не выполнялась.
 Baseline: frontend tests PASS (40); lint/typecheck PASS; полный backend test BLOCKED на uv_os_get_passwd ENOMEM embedded PostgreSQL; Graphify CLI и gh CLI недоступны.
 В CI добавлен browser smoke после установки Chromium; отдельная интеграционная приёмка файлов требует тестовых приватных S3 и ClamAV.
+
+## 2026-11-15 — Stage 3Б
+
+Реализована явная отвязка ShiftRole от Squad: отдельный PATCH с точным body, транзакционный AuditLog, сохранение position и полномочий, блокировка перевода/снятия последнего членства и обновление Staffing UI. Добавлен интеграционный сценарий с PostgreSQL для permission/no-op/conflict случаев. Полный набор проверок запускается после исправления оставшихся ошибок среды/кода.

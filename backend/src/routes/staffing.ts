@@ -2,7 +2,7 @@ import type {FastifyInstance,FastifyRequest} from 'fastify';
 import type {PrismaClient,User} from '@prisma/client';
 import {z} from 'zod';
 import {StaffingService} from '../services/staffing.js';
-import {applicationCreateSchema,applicationDecisionSchema,idParam,pagination,positionSchema,recruitmentSchema,searchQuery} from '../domain/schemas.js';
+import {applicationCreateSchema,applicationDecisionSchema,detachRoleSchema,idParam,pagination,positionSchema,recruitmentSchema,searchQuery} from '../domain/schemas.js';
 
 export function registerStaffingRoutes(app:FastifyInstance,db:PrismaClient,authenticate:(request:FastifyRequest)=>Promise<User>) {
  const service=new StaffingService(db);
@@ -19,6 +19,7 @@ export function registerStaffingRoutes(app:FastifyInstance,db:PrismaClient,authe
  app.get('/api/me/assignments',async request=>{const actor=await authenticate(request);const {page,pageSize}=pagination.parse(request.query);return service.assignments(actor.id,undefined,page,pageSize);});
  app.post('/api/shifts/:id/roles',async(request,reply)=>{const actor=await authenticate(request);const {id}=idParam.parse(request.params);const result=await service.assign(actor.id,id,positionSchema.parse(request.body));reply.code(201);return result;});
  app.delete('/api/shifts/:id/roles/:roleId',async(request,reply)=>{const actor=await authenticate(request);const {id,roleId}=z.object({id:z.string().min(1).max(100),roleId:z.string().min(1).max(100)}).strict().parse(request.params);z.object({}).strict().parse(request.body??{});await service.removeAssignment(actor.id,id,roleId);reply.code(204).send();});
+ app.patch('/api/shifts/:id/roles/:roleId/squad',async request=>{const actor=await authenticate(request);const {id,roleId}=z.object({id:z.string().min(1).max(100),roleId:z.string().min(1).max(100)}).strict().parse(request.params);detachRoleSchema.parse(request.body);return service.detachRoleFromSquad(actor.id,id,roleId);});
  app.get('/api/shifts/:id/staffing-history',async request=>{const actor=await authenticate(request);const {id}=idParam.parse(request.params);const {page,pageSize}=pagination.parse(request.query);return service.history(actor.id,id,page,pageSize);});
  app.get('/api/me/notifications',async request=>{const actor=await authenticate(request);const {page,pageSize}=pagination.parse(request.query);return service.notifications(actor.id,page,pageSize);});
  app.post('/api/me/notifications/:id/read',async request=>{const actor=await authenticate(request);const {id}=idParam.parse(request.params);z.object({}).strict().parse(request.body??{});return service.readNotification(actor.id,id);});
