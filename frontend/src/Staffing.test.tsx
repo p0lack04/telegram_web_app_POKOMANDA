@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {renderToStaticMarkup} from 'react-dom/server';
 import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
-import Staffing,{OwnStaffing,allowedPositions,recruitmentFor} from './Staffing';
+import Staffing,{OwnStaffing,allowedPositions,recruitmentFor,refreshStaffing} from './Staffing';
 import {type Shift,type UserSummary,type StaffingInfo,type Application,type Page} from './types';
 
 const shift:Shift={id:'s',title:'Летняя смена',description:null,startDate:'2026-06-01',endDate:'2026-06-20',stage:'STAGE_4',visibility:'ADMIN_LEAD_TRAINEE',leadRecruitOpen:true,traineeRecruitOpen:false};
@@ -17,6 +17,30 @@ function setup(overrides:Partial<StaffingInfo>={}) {
 function render(client:QueryClient,user=person) {return renderToStaticMarkup(<QueryClientProvider client={client}><Staffing shift={shift} user={user}/></QueryClientProvider>);}
 
 describe('Правила набора в UI',()=>{
+ it.each([
+  ['ADMIN',true,'Руководитель','q',true],
+  ['LEAD',true,'Руководитель','q',false],
+  ['TRAINEE',true,'Руководитель','q',false],
+  ['LEAD',true,'Ведущий отряда','q',true],
+  ['ADMIN',false,'Руководитель','q',false],
+  ['LEAD',false,'Ведущий отряда','q',false],
+  ['ADMIN',true,'Руководитель',null,false],
+ ] as const)('отвязка: %s, manage=%s, %s, squad=%s → %s',(role,canManageRoles,position,squadId,visible)=>{
+  const client=setup({canManageRoles});
+  client.setQueryData(['roles','s',1],{...emptyPage,items:[{id:'r',userId:'u',shiftId:'s',position,squadId,createdAt:'2026-04-01',user:person}],total:1});
+  expect(render(client,{...person,role}).includes('Отвязать от отряда')).toBe(visible);
+  expect(render(client,{...person,role})).not.toContain('Подтвердить отвязку');
+ });
+ it('после изменения роли инвалидирует назначения, историю и все кэши squad scope',async()=>{
+  const client=setup();
+  const keys=[['roles','s',1],['staffing','s'],['staff','s','q'],['history','s',1],['own','assignments',1],['notifications',1],['squads','s','list',1],['squads','s','detail','q'],['squads','s','placement'],['children','s','q',1]];
+  for(const key of keys)client.setQueryData(key,{cached:true});
+  client.setQueryData(['unrelated'],{});
+  await refreshStaffing(client);
+  for(const key of keys)expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(['unrelated'])?.isInvalidated).toBe(false);
+  client.clear();
+ });
  it('открытый набор ведущих не зависит от этапа смены',()=>expect(recruitmentFor(shift,'LEAD')).toEqual({type:'LEAD_RECRUIT',open:true}));
  it('флаг стажёров проверяется отдельно',()=>expect(recruitmentFor(shift,'TRAINEE')).toEqual({type:'TRAINEE_RECRUIT',open:false}));
  it('ADMIN не подаёт заявку на себя',()=>expect(recruitmentFor(shift,'ADMIN')).toBeNull());

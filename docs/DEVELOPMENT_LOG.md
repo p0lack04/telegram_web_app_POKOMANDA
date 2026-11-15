@@ -109,3 +109,24 @@ Baseline: frontend tests PASS (40); lint/typecheck PASS; полный backend te
 ## 2026-11-15 — Stage 3Б
 
 Реализована явная отвязка ShiftRole от Squad: отдельный PATCH с точным body, транзакционный AuditLog, сохранение position и полномочий, блокировка перевода/снятия последнего членства и обновление Staffing UI. Добавлен интеграционный сценарий с PostgreSQL для permission/no-op/conflict случаев. Полный набор проверок запускается после исправления оставшихся ошибок среды/кода.
+
+## 2026-11-15 — Stage 3Б follow-up: detach review
+
+Исходное дерево чистое; ветка fix/stage-3b-detach-review, HEAD и локальный origin/main = e081cb7bcce68aa1aedf171312896d956f3472b9. Ветка не переключалась; fetch/commit/push/merge/deploy не выполнялись.
+
+Изменения: ADMIN-only кнопка отвязки «Руководитель»; refreshStaffing дополнительно инвалидирует squads/children (list/detail/placement/capabilities). Сохранены серверные правила, schema и migrations. Добавлены 8 frontend-тестов и 7 PostgreSQL regression tests. Browser smoke проверяет UI назначения, 409 реального API перевода, отмену подтверждения без записи, pending, 403/409/500/network errors с повтором, успешную отвязку без reload, историю и успешный перевод. Перехват HTTP используется только для frontend fault tests; успешный сценарий работает с Fastify/PostgreSQL.
+
+Проверки:
+- Baseline: Staffing frontend 15 PASS; staffing PostgreSQL 24 PASS вне sandbox.
+- Целевые после изменений: Staffing frontend 23 PASS; staffing PostgreSQL 31 PASS.
+- npm.cmd run generate — PASS.
+- npm.cmd run db:validate — PASS с синтетическим DATABASE_URL только для валидации схемы, без подключения; первый запуск без переменной дал P1012.
+- npm.cmd run lint — PASS; npm.cmd run typecheck — PASS.
+- npm.cmd test — PASS: backend 142, frontend 48. Временные PostgreSQL проверили миграции, в том числе upgrade foundation с существующими данными.
+- npm.cmd run test:browser — PASS; включает npm run build (backend + frontend PASS). Первый прогон упал на неоднозначном test locator для двух success-сообщений; сценарий исправлен закрытием формы назначения, повторный прогон прошёл полностью. Во время штатного restartApi зарегистрирован нефатальный proxy ECONNRESET.
+- node --check scripts/browser-smoke.mjs и git diff --check — PASS.
+- graphify update . — PASS вне sandbox; граф обновлён. Предупреждения: частичный AST-разбор Staffing.tsx и существующие невалидные UTF-8 фрагменты FEATURE_MATRIX/DEVELOPMENT_LOG. Новые записи добавлены UTF-8 без перекодировки исторических байтов.
+
+Среда: PowerShell блокирует npm.ps1, использован npm.cmd. Sandbox блокирует системный user lookup embedded-postgres (uv_os_get_passwd ENOMEM) и launcher Graphify; повторные запуски вне sandbox успешны. Итоговых FAIL/BLOCKED проверок нет.
+
+Ограничения: у перевода педсостава нет формы в текущем UI, поэтому browser вызывает реальный API той же session; полная UI-приёмка lifecycle Stage 3Б остаётся открытой. Межсессионного push-обновления нет: проверена текущая серверная авторизация при каждом запросе и локальная TanStack Query invalidation. Stage 3В/4 не развивались. Commit/push/PR оставлены владельцу; команды приведены в отчёте.

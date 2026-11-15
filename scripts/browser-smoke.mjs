@@ -145,6 +145,57 @@ try {
  const firstSquad=await db.squad.create({data:{shiftId:squadShift.id,name:'Северный',sortOrder:1}});
  const secondSquad=await db.squad.create({data:{shiftId:squadShift.id,name:'Южный',sortOrder:2}});
  const privateSquad=await db.squad.create({data:{shiftId:squadShift.id,name:'Недоступный',sortOrder:3}});
+ // Stage 3Б follow-up: реальные назначение → 409 → явная отвязка → перевод.
+ // У перевода педсостава пока нет UI: вызываем реальный API той же browser session.
+ const detachMember=await db.squadMember.create({data:{shiftId:squadShift.id,squadId:firstSquad.id,userId:manual.user.id,firstName:'Тест',lastName:'Ручной',memberType:'LEAD'}});
+ await admin.page.reload();await openShift(admin.page);
+ await panel(admin.page,'Педсостав смены').locator('li').filter({hasText:'Ручной Тест'}).getByRole('button',{name:'Назначить должность'}).click();
+ await admin.page.getByLabel('Должность',{exact:true}).selectOption('Руководитель');
+ await admin.page.getByLabel('Отряд (необязательно)').selectOption(firstSquad.id);
+ await admin.page.getByRole('button',{name:'Назначить',exact:true}).click();
+ const detachedRow=panel(admin.page,'Должности на смене').locator('li').filter({has:admin.page.getByText('Руководитель',{exact:true})});
+ await expect(detachedRow.getByText('Отряд: Северный',{exact:true})).toBeVisible();
+ await admin.page.getByRole('button',{name:'Закрыть форму',exact:true}).click();
+ const assignedRole=await db.shiftRole.findFirstOrThrow({where:{shiftId:squadShift.id,userId:manual.user.id,position:'Руководитель'}});
+ const transfer=()=>admin.context.request.patch(`${origin}/api/shifts/${squadShift.id}/squad-members/${detachMember.id}`,{headers:{origin},data:{squadId:secondSquad.id}});
+ expect((await transfer()).status()).toBe(409);
+ await manual.page.reload();await openShift(manual.page);
+ const restrictedRow=panel(manual.page,'Должности на смене').locator('li').filter({has:manual.page.getByText('Руководитель',{exact:true})});
+ await expect(restrictedRow).toBeVisible();
+ await expect(restrictedRow.getByRole('button',{name:'Отвязать от отряда',exact:true})).toHaveCount(0);
+ await detachedRow.getByRole('button',{name:'Отвязать от отряда',exact:true}).click();
+ await expect(detachedRow.getByText('Отвязать должность от отряда? Должность и полномочия сохранятся.',{exact:true})).toBeVisible();
+ await detachedRow.getByRole('button',{name:'Отмена',exact:true}).click();
+ expect((await db.shiftRole.findUniqueOrThrow({where:{id:assignedRole.id}})).squadId).toBe(firstSquad.id);
+ expect(await db.auditLog.count({where:{entityId:assignedRole.id,action:'POSITION_SQUAD_DETACHED'}})).toBe(0);
+ const detachUrl=`**/api/shifts/${squadShift.id}/roles/${assignedRole.id}/squad`;
+ // Изолированные frontend fault tests; затем снимаем перехват и проверяем реальный API.
+ for(const status of [403,409,500,0]) {
+  await admin.page.route(detachUrl,route=>status===0?route.abort('failed'):route.fulfill({status,contentType:'application/json',body:JSON.stringify({error:{code:'TEST_ERROR',message:`Ошибка отвязки ${status}`}})}));
+  if(status===403)await detachedRow.getByRole('button',{name:'Отвязать от отряда',exact:true}).click();
+  await detachedRow.getByRole('button',{name:'Подтвердить отвязку',exact:true}).click();
+  await expect(panel(admin.page,'Должности на смене').getByRole('alert')).toContainText(status===0?'Нет связи с сервером':`Ошибка отвязки ${status}`);
+  await expect(detachedRow.getByText('Отряд: Северный',{exact:true})).toBeVisible();
+  expect((await db.shiftRole.findUniqueOrThrow({where:{id:assignedRole.id}})).squadId).toBe(firstSquad.id);
+  await admin.page.unroute(detachUrl);
+ }
+ let releaseDetach;
+ const pendingDetach=new Promise(resolve=>{releaseDetach=resolve;});
+ await admin.page.route(detachUrl,async route=>{await pendingDetach;await route.continue();});
+ await detachedRow.getByRole('button',{name:'Подтвердить отвязку',exact:true}).click();
+ try {
+  await expect(detachedRow.getByRole('button',{name:'Подтвердить отвязку',exact:true})).toBeDisabled();
+  await expect(detachedRow.getByRole('button',{name:'Отмена',exact:true})).toBeDisabled();
+ } finally {releaseDetach();}
+ await expect(detachedRow.getByText('Без привязки к отряду',{exact:true})).toBeVisible();
+ await expect(detachedRow.getByRole('button',{name:'Отвязать от отряда',exact:true})).toHaveCount(0);
+ await expect(panel(admin.page,'Должности на смене').getByRole('status')).toContainText('Изменения сохранены');
+ await expect(panel(admin.page,'История набора и назначений').getByText('Должность отвязана от отряда',{exact:true})).toBeVisible();
+ await admin.page.unroute(detachUrl);
+ expect((await transfer()).status()).toBe(200);
+ expect((await db.squadMember.findUniqueOrThrow({where:{id:detachMember.id}})).squadId).toBe(secondSquad.id);
+ expect((await db.shiftRole.findUniqueOrThrow({where:{id:assignedRole.id}})).position).toBe('Руководитель');
+ expect(await db.auditLog.count({where:{entityId:assignedRole.id,action:'POSITION_SQUAD_DETACHED'}})).toBe(1);
  await db.shiftRole.create({data:{shiftId:squadShift.id,userId:lead.user.id,position:'Стажёр',squadId:firstSquad.id}});
  await db.squadMember.create({data:{shiftId:squadShift.id,squadId:secondSquad.id,userId:lead.user.id,firstName:'Синтетический',lastName:'Участник',memberType:'LEAD'}});
  // Membership без view permission не открывает даже собственный отряд.

@@ -103,3 +103,12 @@ Foundation и этап 2 работают. Срез 3А исправляет д�
 Backend-срезы Squad CRUD, членства, оплаты, заезда и DailyMark обнаружены в исходниках, но не имеют полного UI и regression-покрытия, поэтому 3Б/3В остаются частичными. Программа и банк реализованы; приватные файлы S3/ClamAV и файловый UI отсутствуют, этап 4 не закрыт.
 
 | Явная отвязка ShiftRole от отряда | `Staffing.tsx` | `PATCH /api/shifts/:id/roles/:roleId/squad` | `shift.manage_roles`, ADMIN-only для «Руководитель», visibility/object scope; 409 защищает move/remove | integration + typecheck | **реализовано Stage 3Б** |
+
+## Stage 3Б follow-up — review явной отвязки (2026-11-15)
+
+- UI отвязки «Руководитель» доступен только ADMIN с серверным canManageRoles; остальные назначения требуют canManageRoles и непустой squadId.
+- После staffing mutations, включая отвязку и ошибки, инвалидируются также списки/детали/placement отрядов и children capabilities. Session не инвалидируется: глобальная роль не меняется; права и scope перечитываются сервером.
+- Frontend: матрица прав и инвалидация QueryClient; browser: подтверждение/отмена, pending, 403/409/500/network error, успешная отвязка и обновление списка/истории без reload.
+- PostgreSQL: ADMIN-only, повторный no-op без второго audit/notification, несколько должностей/членств, сохранение admission/global role/permissions, актуальный scope в той же сессии, изоляция смен, конкурентные detach/move и rollback всей транзакции при ошибке notification.
+- Browser flow назначает привязанную должность через UI, получает реальный 409 при переводе, отвязывает через UI и успешно переводит через API той же сессии. Формы перевода педсостава в текущем UI нет; весь Stage 3Б этим follow-up не закрывается. Stage 3В/4 не изменялись.
+- Подробные результаты команд — в DEVELOPMENT_LOG.md. Модели, миграции и утверждённые бизнес-правила не изменены.

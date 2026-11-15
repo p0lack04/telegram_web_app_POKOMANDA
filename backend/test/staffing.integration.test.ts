@@ -20,6 +20,18 @@ const get=(user:User,url:string)=>app.inject({url,headers:headers(user)});
 const post=(user:User,url:string,payload:object)=>app.inject({method:'POST',url,headers:headers(user),payload});
 const patch=(user:User,url:string,payload:object)=>app.inject({method:'PATCH',url,headers:headers(user),payload});
 const remove=(user:User,url:string)=>app.inject({method:'DELETE',url,headers:headers(user),payload:{}});
+let detachUserId=300;
+async function detachFixture(position='Ведущий отряда') {
+ const user=await fixture(++detachUserId,'LEAD');
+ const shift=await db.shift.create({data:{title:'Detach regression',startDate:new Date('2027-01-01'),endDate:new Date('2027-01-10'),visibility:'ADMIN_LEAD_TRAINEE'}});
+ const a=await db.squad.create({data:{shiftId:shift.id,name:'A'}});
+ const b=await db.squad.create({data:{shiftId:shift.id,name:'B'}});
+ await db.application.create({data:{shiftId:shift.id,userId:user.id,type:'LEAD_RECRUIT',status:'APPROVED'}});
+ const member=await db.squadMember.create({data:{shiftId:shift.id,squadId:a.id,userId:user.id,memberType:'LEAD',firstName:'Тест',lastName:'Отвязка'}});
+ const role=await db.shiftRole.create({data:{shiftId:shift.id,userId:user.id,position,squadId:a.id}});
+ const base=`/api/shifts/${shift.id}`;
+ return {user,shift,a,b,member,role,base,detach:`${base}/roles/${role.id}/squad`};
+}
 async function fixture(id:number,role:User['role'],confirmed=true) {
  const user=await db.user.create({data:{telegramId:BigInt(id),firstName:'Тест',lastName:`Сотрудник${id}`,role,isOnboarded:true,accountStatus:confirmed?'CONFIRMED':'PENDING'}});
  const token=randomBytes(32).toString('base64url');await db.session.create({data:{userId:user.id,tokenHash:hashToken(token),expiresAt:new Date(Date.now()+3600000)}});cookies.set(user.id,`komanda_session=${token}`);return user;
@@ -45,6 +57,94 @@ beforeAll(async()=>{
  hiddenId=(await db.shift.create({data:{title:'Скрытая',startDate:new Date('2027-01-01'),endDate:new Date('2027-01-10')}})).id;
 },120000);
 afterAll(async()=>{if(app)await app.close();if(db)await db.$disconnect();if(pg)await pg.stop();},30000);
+
+describe('Stage 3Б: explicit detach regressions',()=>{
+ it('Руководителя отвязывает только ADMIN, включая повторный no-op',async()=>{
+  const f=await detachFixture('Руководитель');
+  await db.shiftRole.create({data:{shiftId:f.shift.id,userId:deputy.id,position:'Заместитель руководителя'}});
+  for(const actor of [deputy,f.user,trainee,pending])expect((await patch(actor,f.detach,{squadId:null})).statusCode).toBe(403);
+  expect((await db.shiftRole.findUniqueOrThrow({where:{id:f.role.id}})).squadId).toBe(f.a.id);
+  expect((await patch(admin,f.detach,{squadId:null})).statusCode).toBe(200);
+  expect((await patch(deputy,f.detach,{squadId:null})).statusCode).toBe(403);
+  expect((await patch(admin,f.detach,{squadId:null})).statusCode).toBe(200);
+  expect(await db.auditLog.count({where:{entityId:f.role.id,action:'POSITION_SQUAD_DETACHED'}})).toBe(1);
+  expect(await db.notification.count({where:{userId:f.user.id,shiftId:f.shift.id}})).toBe(1);
+ });
+ it('несколько должностей и членств сохраняются; оставшаяся привязка блокирует перевод',async()=>{
+  const f=await detachFixture();
+  const second=await db.shiftRole.create({data:{shiftId:f.shift.id,userId:f.user.id,position:'Стажёр',squadId:f.a.id}});
+  await db.squadMember.create({data:{shiftId:f.shift.id,squadId:f.b.id,userId:f.user.id,memberType:'LEAD',firstName:'Тест',lastName:'Отвязка'}});
+  const memberships=await db.squadMember.findMany({where:{userId:f.user.id},orderBy:{id:'asc'}});
+  expect((await patch(admin,f.detach,{squadId:null})).statusCode).toBe(200);
+  expect(await db.squadMember.findMany({where:{userId:f.user.id},orderBy:{id:'asc'}})).toEqual(memberships);
+  expect(await db.shiftRole.findUnique({where:{id:second.id}})).toEqual(second);
+  expect((await patch(admin,`${f.base}/squad-members/${f.member.id}`,{squadId:f.b.id})).statusCode).toBe(409);
+  expect((await remove(admin,`${f.base}/squad-members/${f.member.id}`)).statusCode).toBe(409);
+  expect((await patch(admin,`${f.base}/roles/${second.id}/squad`,{squadId:null})).statusCode).toBe(200);
+  expect((await remove(admin,`${f.base}/squad-members/${f.member.id}`)).statusCode).toBe(200);
+  expect(await db.shiftRole.count({where:{userId:f.user.id}})).toBe(2);
+ });
+ it('сохраняет position, admission, global role и права; scope перечитывается в той же сессии',async()=>{
+  const f=await detachFixture();
+  const admission=await db.application.findFirstOrThrow({where:{userId:f.user.id}});
+  expect((await get(f.user,`${f.base}/squads/${f.a.id}`)).statusCode).toBe(200);
+  expect((await patch(admin,f.detach,{squadId:null})).statusCode).toBe(200);
+  expect(await db.shiftRole.findUnique({where:{id:f.role.id}})).toEqual({...f.role,squadId:null});
+  expect(await db.user.findUnique({where:{id:f.user.id}})).toEqual(f.user);
+  expect(await db.application.findUnique({where:{id:admission.id}})).toEqual(admission);
+  // Membership по-прежнему предоставляет scope; position по-прежнему даёт squad.manage.
+  expect((await get(f.user,`${f.base}/squads/${f.a.id}`)).statusCode).toBe(200);
+  expect((await patch(f.user,`${f.base}/squads/${f.a.id}`,{name:'Сохранено право управления'})).statusCode).toBe(200);
+  expect((await patch(admin,`${f.base}/squad-members/${f.member.id}`,{squadId:f.b.id})).statusCode).toBe(200);
+  expect((await get(f.user,`${f.base}/squads/${f.a.id}`)).statusCode).toBe(404);
+  expect((await get(f.user,`${f.base}/squads/${f.b.id}`)).statusCode).toBe(200);
+  expect((await get(f.user,`${f.base}/squads`)).json().items.map((s:{id:string})=>s.id)).toEqual([f.b.id]);
+ });
+ it('чужая смена, скрытая смена и неизвестное назначение не изменяют роль',async()=>{
+  const f=await detachFixture();const otherFixture=await detachFixture();
+  expect((await patch(admin,`${otherFixture.base}/roles/${f.role.id}/squad`,{squadId:null})).statusCode).toBe(404);
+  expect((await patch(admin,`${f.base}/roles/missing/squad`,{squadId:null})).statusCode).toBe(404);
+  await db.shiftRole.create({data:{shiftId:f.shift.id,userId:deputy.id,position:'Заместитель руководителя'}});
+  expect((await patch(deputy,otherFixture.detach,{squadId:null})).statusCode).toBe(403);
+  await db.shift.update({where:{id:f.shift.id},data:{visibility:'ADMIN_ONLY'}});
+  expect((await patch(deputy,f.detach,{squadId:null})).statusCode).toBe(404);
+  expect(await db.shiftRole.findUnique({where:{id:f.role.id}})).toEqual(f.role);
+  expect(await db.shiftRole.findUnique({where:{id:otherFixture.role.id}})).toEqual(otherFixture.role);
+  expect(await db.auditLog.count({where:{shiftId:{in:[f.shift.id,otherFixture.shift.id]}}})).toBe(0);
+ });
+ it('две параллельные отвязки дают один audit и одно уведомление',async()=>{
+  const f=await detachFixture();
+  const results=await Promise.all([patch(admin,f.detach,{squadId:null}),patch(admin,f.detach,{squadId:null})]);
+  expect(results.map(r=>r.statusCode)).toEqual([200,200]);
+  expect((await db.shiftRole.findUniqueOrThrow({where:{id:f.role.id}})).squadId).toBeNull();
+  expect(await db.auditLog.count({where:{entityId:f.role.id}})).toBe(1);
+  expect(await db.notification.count({where:{userId:f.user.id,shiftId:f.shift.id}})).toBe(1);
+ });
+ it('конкурирующие перевод и отвязка сохраняют согласованное состояние',async()=>{
+  const f=await detachFixture();
+  const [move,detach]=await Promise.all([patch(admin,`${f.base}/squad-members/${f.member.id}`,{squadId:f.b.id}),patch(admin,f.detach,{squadId:null})]);
+  expect(detach.statusCode).toBe(200);expect([200,409]).toContain(move.statusCode);
+  expect((await db.shiftRole.findUniqueOrThrow({where:{id:f.role.id}})).squadId).toBeNull();
+  expect((await db.squadMember.findUniqueOrThrow({where:{id:f.member.id}})).squadId).toBe(move.statusCode===200?f.b.id:f.a.id);
+  if(move.statusCode===409)expect((await patch(admin,`${f.base}/squad-members/${f.member.id}`,{squadId:f.b.id})).statusCode).toBe(200);
+ });
+ it('ошибка записи notification откатывает отвязку и уже записанный audit',async()=>{
+  const f=await detachFixture();
+  await db.$executeRawUnsafe(`CREATE FUNCTION reject_detach_notification() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'test notification failure'; END $$`);
+  await db.$executeRawUnsafe(`CREATE TRIGGER reject_detach_notification BEFORE INSERT ON "Notification" FOR EACH ROW EXECUTE FUNCTION reject_detach_notification()`);
+  try {
+   expect((await patch(admin,f.detach,{squadId:null})).statusCode).toBe(500);
+   expect(await db.shiftRole.findUnique({where:{id:f.role.id}})).toEqual(f.role);
+   expect(await db.squadMember.findUnique({where:{id:f.member.id}})).toEqual(f.member);
+   expect(await db.auditLog.count({where:{entityId:f.role.id}})).toBe(0);
+   expect(await db.notification.count({where:{userId:f.user.id}})).toBe(0);
+  } finally {
+   await db.$executeRawUnsafe(`DROP TRIGGER reject_detach_notification ON "Notification"`);
+   await db.$executeRawUnsafe(`DROP FUNCTION reject_detach_notification()`);
+  }
+  expect((await patch(admin,f.detach,{squadId:null})).statusCode).toBe(200);
+ });
+});
 
 describe('staffing HTTP + PostgreSQL',()=>{
  it('миграция сохранила существующие заявки и дала version=0',async()=>{const row=await db.application.findUniqueOrThrow({where:{id:'legacy-application'}});expect(row.version).toBe(0);expect(row.status).toBe('PENDING');});
