@@ -14,10 +14,6 @@
 - Добавлены backend policy/service/routes и PostgreSQL integration tests на union scope, pagination/count, cross-shift/hidden/IDOR, inactive/unauth, strict query и DTO. Frontend добавил список/detail внутри ShiftDetail, loading/empty/error/403/404/retry, keyboard/back navigation, mobile/dark/reduced-motion-compatible UI. Staffing не расширялся.
 - Проверки после интеграции: 107 backend + 33 frontend tests PASS; lint, typecheck, build PASS; browser smoke с реальным API/PostgreSQL PASS (staffing regression + Squad list/detail, union scope, direct 404, denied access, empty, revoked-access cache/retry, keyboard/back, mobile/dark, no overflow/page errors/React warnings).
 
-## Примечание
-Изменения вложенного dirty worktree `.claude/worktrees/agent-a427cb9d5e9e0ca05` не трогались и не включаются в feature branch.
-
-
 ## 2026-11-11 — начало этапа 2
 - Проверены чистый status, main == origin/main f084151 после fetch; создана feat/shift-applications.
 - Foundation не переписывается. Baseline: lint/typecheck/build PASS, 66 backend + 6 frontend tests PASS.
@@ -50,8 +46,17 @@
 - Опубликованные логические коммиты: 60588fe (контекст), 6e11602 (API/миграция/тесты), ca2599b (notification scope fix), 4c17b72 (UI/browser), 07313ce (документация).
 - Финальный snapshot: 124 tests PASS, browser PASS, lint/typecheck/build PASS, audit 0. Тестовые сервисы остановлены. Следующий функциональный этап — отряды/участники и полевые права; Telegram delivery остаётся отдельно.
 
-## 2026-11-13 — конфигурация Claude Code
-- Только конфигурация/docs: сокращены CLAUDE/Git rules, 5 agents → implementation/sonnet + quick-scout/haiku + security-reviewer/sonnet; 9 skills сохранены, 4 уточнены. Подробности: [аудит конфигурации](CLAUDE_CODE_CONFIG.md). Roadmap/продуктовые статусы/API/Prisma/UI не менялись.
-- Ветка chore/claude-code-token-optimization уже существовала; пользователь подтвердил продолжение без переключения и исключение грязного вложенного gitlink. После fetch HEAD == origin/main. Удаление четырёх старых agent-файлов отдельно подтверждено.
-- Финальные проверки: lint/typecheck/build PASS, 99 backend + 25 frontend tests PASS; browser smoke PASS (real API/PostgreSQL). Статический node scripts/check-claude-config.mjs PASS. Install не требовался, миграции не менялись.
-- settings/env/секреты и пользовательская конфигурация не менялись; live Tooken routing/billing не проверены. gh отсутствует; PR требует доступного CLI/авторизации.
+## 2026-11-15 — подготовка ChatGPT / Codex
+
+Перенесены 10 навыков, бизнес-правила и три профиля субагентов; настроен Graphify MCP, добавлен CI. Lint/typecheck/build и все 156 тестов прошли. Инструкции настройки сохранены локально и исключены из Git. Код приложения и схема БД не менялись.
+
+## 2026-11-15 — переход в komanda-codex
+
+По решению владельца komanda-codex стала основной рабочей папкой. Перенесены настройки и незакоммиченные изменения, сохранены Git history и origin. Зависимости восстановлены по lockfile, Prisma Client создан заново. Предыдущая папка komanda сохранена.
+
+## 2026-11-15 — очистка инструментов и полный аудит
+По запросу владельца удалена прежняя интеграция Claude Code: каталог, инструкции, валидатор и отдельный отчёт конфигурации. Незакоммиченные исходники четырёх вложенных рабочих копий сохранены в игнорируемом локальном резервном каталоге; копии сверены SHA256. Настройки/навыки Codex, AGENTS.md, служебные инструкции, граф и резервные копии исключены из Git. CI сохранён как часть проекта. История Git не переписывалась; commit/push не выполнялись. Пользователь подтвердил продолжение на исходной dirty ветке chore/codex-setup.
+
+Полностью изучены неизменённые 1.txt/2.txt/3.txt; существующий Graphify использован для навигации, выводы сверены с кодом. Обновлены матрица, контекст, аудит и предлагаемые этапы. Новые бизнес-правила не утверждались, приложение/схема/миграции не менялись.
+
+Baseline: npm.cmd run lint/typecheck/build — PASS; npm.cmd test — 123 backend + 33 frontend PASS; npm.cmd run test:browser — PASS (foundation, staffing, метаданные отрядов; без сценариев детей/XLSX). Embedded PostgreSQL требует запуска вне sandbox: внутри uv_os_get_passwd ENOMEM. Миграции применены тестовыми раннерами на временной PostgreSQL. Проверка childCreateSchema подтвердила: отсутствие middleName допускается, пустая строка из формы отвергается. Production Telegram, staging, backup/restore и нагрузка не проверены. Graphify не перестраивался: исходники приложения не менялись; старый граф может содержать ссылки на удалённые инструкции.
