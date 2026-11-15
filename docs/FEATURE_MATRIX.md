@@ -41,7 +41,7 @@
 | DailyMark | `3.txt` only | unique member+date | setter scope planned | не реализован | **схема** |
 | BankEvent catalog | `3.txt` only | BankEvent schema | public/private policy planned | не реализован | **схема** |
 | BankEventFile upload/download | `3.txt` object/data URL | private metadata storage schema, scanStatus | protected signed/object storage endpoint pending | не реализован | **прототип + схема** |
-| Program / bank link | `3.txt` fake API | ProgramItem owns bankEventId | change audit/schema | не реализован | **схема** |
+| Program / bank link | `Program.tsx` | ProgramWorkflowService + ProgramItem.bankEventId | field rights + bank scope + audit | HTTP + browser | **реализовано v1** |
 | TechRequest | `3.txt` fake statuses | single owner TechRequest.programItemId + shift FK | tech lead/assignee policy pending | не реализован | **схема** |
 | Surveys / submission | `3.txt` answer upsert | SurveySubmission unique user+survey | audience / one atomic submission planned | не реализован | **схема** |
 | Documents | `3.txt` metadata only | UserDocument metadata | restricted DTO/policy pending | не реализован | **прототип + схема** |
@@ -61,10 +61,10 @@
 | Изменить этап / настройки / видимость | Staffing stage ready; остальные patch-settings не подключены | stage PATCH ready; visibility только при создании | ADMIN | stage integration/browser | **частично: этап готов, редактирование visibility/title/dates не готово** |
 | Мой отряд / поиск / фильтр типа | scoped список и карточка; отдельного экрана/фильтров нет | scoped GET отрядов/детей есть | view_own + связь | scope integration/browser метаданных | **частично** |
 | Мои отметки стажёра | `ScreenDailyMarks`, profile marks | DailyMark schema | own-only endpoint pending | нет | **схема** |
-| Программа: reorder/conflicts/ответственный | `ProgramBlock`, `ProgramItemModal` | ProgramItem + AuditLog | field rules / author changes pending | time CHECK DB only | **схема** |
-| Предложения изменений программы | `api.program.propose/resolveProposal` | ProgramProposal schema | creator/admin decision pending | нет | **схема** |
-| История программы | `ChangelogModal` | AuditLog (пока auth/shift only) | read scope pending | нет | **частично: schema** |
-| Привязать/отвязать банк / addToProgram | `api.bankEvents.addToProgram`, `unlinkBank` | bankEventId restrict FK | права программы + приватность банка pending | нет | **схема** |
+| Программа: CRUD/reorder/conflicts/ответственный | `Program.tsx` | ProgramWorkflowService + AuditLog | scope, field policies, lock, updatedAt CAS | HTTP/PostgreSQL + browser | **реализовано v1** |
+| Предложения изменений программы | `Program.tsx` | ProgramProposal + AuditLog | LEAD с допуском/ADMIN; решение ADMIN; own/admin list | HTTP concurrency + browser | **реализовано v1, без уведомлений** |
+| История программы | `Program.tsx` | AuditLog: действия, автор, дата; пагинация | текущий scope программы | HTTP + browser | **история действий v1; без снимков значений** |
+| Привязать/отвязать банк / addToProgram | `Program.tsx` | ProgramWorkflowService + bankEventId FK | повторная проверка банка; скрытие закрытого оригинала | HTTP privacy + browser CRUD/original | **реализовано v1, файлы отдельно** |
 | Файлы: delete/gallery/progress | `GalleryModal`, `FileRow`, `UploadFilesModal` | schema, реального storage нет | scanner/private delivery pending | size CHECK DB only | **прототип** |
 | Опрос: конструктор/activation/delete | `SurveyFormModal`, `SurveysBlock` | Survey/Question schema | create/results permissions pending | нет | **схема** |
 | Опрос: результаты/CSV/диаграммы | `ScreenSurveyResults`, `api.surveys.exportCSV` | Answer/Submission schema | aggregate privacy + formula injection protection pending | FK/unique DB integration only | **схема** |
@@ -95,4 +95,4 @@ Foundation и этап 2 работают. Срез 3А исправляет д�
 
 
 ## Этап 4 — срез 2026-11-15
-BankEvent catalog/search/create/update и ProgramItem CRUD с server-side visibility, permission checks и audit — готово v1. Protected file storage/download/delete, program reorder/conflicts и proposals/history — не реализовано.
+Базовый BankEvent catalog/search/create/update существует. Программа: CRUD, выбор активного принятого ответственного, фильтрация по дням, reorder, конфликты, блокировки, полевые права, updatedAt CAS, предложения и история действий подключены через UI/API/PostgreSQL. Файлы S3/ClamAV, файловый UI и уведомления программы не реализованы; этап 4 частичный.
