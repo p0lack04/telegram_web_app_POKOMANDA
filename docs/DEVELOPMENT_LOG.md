@@ -95,3 +95,13 @@ Baseline: npm.cmd run lint/typecheck/build — PASS; npm.cmd test — 123 backen
 - Изменений Prisma schema/миграций нет; тесты применили существующие миграции на временной PostgreSQL. Production БД и внешние сервисы не менялись. Собственное ревью выполнено по code-review; независимый review не выполнялся.
 - Владелец подтвердил: S3 и ClamAV ещё не настроены. Upload/download/delete, проверка файлов, S3/ClamAV, orphan cleanup и файловый UI не реализованы и не засчитываются. Уведомления программы также не реализованы. Этап 4 остаётся частичным.
 - `graphify update .` вне sandbox — PASS: граф кода 759 узлов/1760 связей. Graphify предупредил о ранее существующей смешанной кодировке FEATURE_MATRIX.md и DEVELOPMENT_LOG.md; семантическое обновление документов не заявляется. Новые фрагменты записаны в UTF-8 с сохранением прежних байтов. Локальные Markdown-ссылки и финальный git diff --check — PASS.
+
+
+## 2026-11-15 — аудит этапов 3Б/3В/4
+
+Фактический HEAD: e31831fcab163686294852cdd6605dffe647c427; отдельная ветка feat/stages-3b-3v-4-implementation.
+3Б/3В: backend routes/services и миграция 202611150004_stage_3bc присутствуют, но UI lifecycle и полная mutation/browser/concurrency приёмка отсутствуют. squad.manage проверяется вместе с соответствующим field permission для оплаты/заезда.
+Этап 4: программа/банк прошли существующую регрессию; BankEventFile остаётся только metadata schema без S3/ClamAV upload/download/delete/orphan cleanup и UI.
+Исправлены повреждённые пользовательские строки состояния педсостава в frontend/src/Squads.tsx; массовая перекодировка не выполнялась.
+Baseline: frontend tests PASS (40); lint/typecheck PASS; полный backend test BLOCKED на uv_os_get_passwd ENOMEM embedded PostgreSQL; Graphify CLI и gh CLI недоступны.
+В CI добавлен browser smoke после установки Chromium; отдельная интеграционная приёмка файлов требует тестовых приватных S3 и ClamAV.
