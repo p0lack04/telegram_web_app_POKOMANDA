@@ -101,3 +101,5 @@ Foundation и этап 2 работают. Срез 3А исправляет д�
 ## Актуальная проверка 2026-11-15
 
 Backend-срезы Squad CRUD, членства, оплаты, заезда и DailyMark обнаружены в исходниках, но не имеют полного UI и regression-покрытия, поэтому 3Б/3В остаются частичными. Программа и банк реализованы; приватные файлы S3/ClamAV и файловый UI отсутствуют, этап 4 не закрыт.
+
+| Явная отвязка ShiftRole от отряда | `Staffing.tsx` | `PATCH /api/shifts/:id/roles/:roleId/squad` | `shift.manage_roles`, ADMIN-only для «Руководитель», visibility/object scope; 409 защищает move/remove | integration + typecheck | **реализовано Stage 3Б** |

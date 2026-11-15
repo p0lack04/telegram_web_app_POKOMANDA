@@ -140,10 +140,22 @@ export class StaffingService {
    await this.record(tx,actor,shift,'POSITION_REMOVED','ShiftRole',id,{subjectUserId:assignment.userId,position:assignment.position,squadId:assignment.squadId},assignment.userId,`Смена «${shift.title}»: снята должность «${assignment.position}».`);
   });
  }
+ async detachRoleFromSquad(actorId:string,shiftId:string,id:string) {
+  return this.mutate(actorId,shiftId,async(tx,actor,shift)=>{
+   requireRule(await this.manager(tx,actor,shift),403,'FORBIDDEN','Нет права управления должностями');
+   const assignment=await tx.shiftRole.findFirst({where:{id,shiftId},select:{id:true,shiftId:true,userId:true,position:true,squadId:true}});
+   requireRule(assignment,404,'NOT_FOUND','Назначение не найдено');
+   requireKnownPosition(assignment.position,actor.role);
+   if(assignment.squadId===null) return {assignment};
+   const updated=await tx.shiftRole.update({where:{id:assignment.id},data:{squadId:null},select:{id:true,shiftId:true,userId:true,position:true,squadId:true}});
+   await this.record(tx,actor,shift,'POSITION_SQUAD_DETACHED','ShiftRole',assignment.id,{subjectUserId:assignment.userId,position:assignment.position,previousSquadId:assignment.squadId,squadId:null},assignment.userId,`Смена «${shift.title}»: должность «${assignment.position}» отвязана от отряда. Должность и полномочия сохранены.`);
+   return {assignment:updated};
+  });
+ }
  async history(actorId:string,shiftId:string,page:number,pageSize:number) {
   return this.db.$transaction(async tx=>{
    const actor=await this.actor(tx,actorId);const shift=await this.shift(tx,actor,shiftId);const manage=await this.manager(tx,actor,shift);
-   const where:Prisma.AuditLogWhereInput={shiftId,action:{in:[...staffingActions]},...(actor.role==='ADMIN'?{}:manage?{action:{in:['POSITION_ASSIGNED','POSITION_REMOVED']}}:{details:{path:['subjectUserId'],equals:actor.id}})};
+   const where:Prisma.AuditLogWhereInput={shiftId,action:{in:[...staffingActions]},...(actor.role==='ADMIN'?{}:manage?{action:{in:['POSITION_ASSIGNED','POSITION_REMOVED','POSITION_SQUAD_DETACHED']}}:{details:{path:['subjectUserId'],equals:actor.id}})};
    const items=await tx.auditLog.findMany({where,select:{id:true,action:true,entityType:true,entityId:true,createdAt:true,details:true,actor:{select:{id:true,firstName:true,lastName:true,middleName:true}}},orderBy:[{createdAt:'desc'},{id:'asc'}],skip:(page-1)*pageSize,take:pageSize});
    const subjectId=(details:Prisma.JsonValue)=>details&&typeof details==='object'&&!Array.isArray(details)&&typeof details.subjectUserId==='string'?details.subjectUserId:undefined;
    const ids=items.map(item=>subjectId(item.details)).filter((id):id is string=>!!id);

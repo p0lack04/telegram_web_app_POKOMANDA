@@ -149,3 +149,7 @@ NODE_ENV=development ADMIN_TELEGRAM_ID=<ваш_числовой_Telegram_ID> npm
 Локальные инструкции, навыки, настройки агентов и граф исключены из Git. Для разработки начните с [контекста](docs/PROJECT_CONTEXT.md), [матрицы функций](docs/FEATURE_MATRIX.md), [аудита](docs/audit/INITIAL-REPOSITORY-REVIEW.md) и [этапов](docs/IMPLEMENTATION-ROADMAP.md).
 
 Аудит 2026-11-15: этап 3 частичен; дети и XLSX имеют backend/UI, но требуют исправлений и отдельной browser-приёмки. Актуальные результаты проверок — в документах выше.
+
+### Staffing API: explicit squad detach
+
+Managers with `shift.manage_roles` can detach a role without deleting it using `PATCH /api/shifts/:id/roles/:roleId/squad` and body `{ "squadId": null }`. The operation preserves the position and its permissions. Moving or removing the last squad membership is rejected with HTTP 409 until the role is detached.
