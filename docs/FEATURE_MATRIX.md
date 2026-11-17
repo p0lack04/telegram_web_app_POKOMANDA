@@ -112,3 +112,9 @@ Backend-срезы Squad CRUD, членства, оплаты, заезда и D
 - PostgreSQL: ADMIN-only, повторный no-op без второго audit/notification, несколько должностей/членств, сохранение admission/global role/permissions, актуальный scope в той же сессии, изоляция смен, конкурентные detach/move и rollback всей транзакции при ошибке notification.
 - Browser flow назначает привязанную должность через UI, получает реальный 409 при переводе, отвязывает через UI и успешно переводит через API той же сессии. Формы перевода педсостава в текущем UI нет; весь Stage 3Б этим follow-up не закрывается. Stage 3В/4 не изменялись.
 - Подробные результаты команд — в DEVELOPMENT_LOG.md. Модели, миграции и утверждённые бизнес-правила не изменены.
+
+## 2026-11-17 — Stage 3Б / 3В: готово к приёмке в рабочей ветке
+
+Реализован UI/API/PostgreSQL цикл: CRUD пустых отрядов, кандидаты, несколько членств, перевод/подтверждённое снятие с CAS и переходом к отвязке должности; scoped history и capabilities. Оплата PARTIAL требует note, checkin сохраняет boolean; двойные полевые права, CAS/no-op/audit rollback. DailyMark list/filter/upsert использует date-only и существующий Shift.timeZone. Удаление зависимостей и автоматические связи не добавлялись. Архивирование заполненного отряда BLOCKED до бизнес-политики.
+
+Проверки полного рабочего дерева: generate/db:validate/lint/typecheck/build PASS; 173 backend + 66 frontend PASS, 1 real-file-service SKIP; browser smoke PASS на реальной PostgreSQL, mobile/light/dark/reduced motion, negative/network retry. Stage4 файлы оформляются отдельным зависимым PR; эти числа относятся совокупному дереву. PR #12: https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/12 . Merge не выполнен.

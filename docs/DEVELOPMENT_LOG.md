@@ -130,3 +130,9 @@ Baseline: frontend tests PASS (40); lint/typecheck PASS; полный backend te
 Среда: PowerShell блокирует npm.ps1, использован npm.cmd. Sandbox блокирует системный user lookup embedded-postgres (uv_os_get_passwd ENOMEM) и launcher Graphify; повторные запуски вне sandbox успешны. Итоговых FAIL/BLOCKED проверок нет.
 
 Ограничения: у перевода педсостава нет формы в текущем UI, поэтому browser вызывает реальный API той же session; полная UI-приёмка lifecycle Stage 3Б остаётся открытой. Межсессионного push-обновления нет: проверена текущая серверная авторизация при каждом запросе и локальная TanStack Query invalidation. Stage 3В/4 не развивались. Commit/push/PR оставлены владельцу; команды приведены в отчёте.
+
+## 2026-11-17 — Stage 3Б / 3В: готово к приёмке в рабочей ветке
+
+Реализован UI/API/PostgreSQL цикл: CRUD пустых отрядов, кандидаты, несколько членств, перевод/подтверждённое снятие с CAS и переходом к отвязке должности; scoped history и capabilities. Оплата PARTIAL требует note, checkin сохраняет boolean; двойные полевые права, CAS/no-op/audit rollback. DailyMark list/filter/upsert использует date-only и существующий Shift.timeZone. Удаление зависимостей и автоматические связи не добавлялись. Архивирование заполненного отряда BLOCKED до бизнес-политики.
+
+Проверки полного рабочего дерева: generate/db:validate/lint/typecheck/build PASS; 173 backend + 66 frontend PASS, 1 real-file-service SKIP; browser smoke PASS на реальной PostgreSQL, mobile/light/dark/reduced motion, negative/network retry. Stage4 файлы оформляются отдельным зависимым PR; эти числа относятся совокупному дереву. PR #12: https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/12 . Merge не выполнен.
