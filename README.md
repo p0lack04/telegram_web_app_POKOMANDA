@@ -166,7 +166,7 @@ API: `GET/POST /api/bank-events/:eventId/files`, `POST .../:fileId/scan`, `GET .
 
 ```powershell
 docker compose -f compose.files-test.yml up -d
-# Дождитесь готовности ClamAV и создания private bucket; проверьте docker compose logs.
+node scripts/wait-files-test.mjs # readiness и создание приватного тестового bucket
 $env:RUN_FILES_SERVICES='1'
 npm.cmd test -w backend -- --run test/bank-files.integration.test.ts
 Remove-Item Env:RUN_FILES_SERVICES
@@ -182,3 +182,5 @@ node --env-file=backend/.env backend/dist/cleanup-bank-files.js
 ```
 
 Запускайте maintenance только с конфигурацией нужного изолированного окружения; для production требуется отдельный операционный запуск владельцем. TTL материалов не вводится. Незавершённые PENDING/ERROR можно повторно проверить через UI, при сбое PUT — повторить исходную загрузку с тем же ключом. Автоматическая очередь фоновых проверок не заявляется реализованной.
+
+Тестовый MinIO собирается из [официального source release](https://github.com/minio/minio/releases/tag/RELEASE.2025-10-15T17-29-55Z) через scripts/minio-test.Dockerfile; прежний Docker Hub образ недоступен. Первая сборка требует сети и времени. Это изолированная тестовая конфигурация, production не меняется.

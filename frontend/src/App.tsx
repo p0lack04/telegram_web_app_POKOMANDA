@@ -5,8 +5,8 @@ import {telegram,useTelegram} from './telegram';
 import Program from './Program';
 import Staffing,{OwnStaffing} from './Staffing';
 import {Squads,SquadDetail} from './Squads';
-import Bank from './Bank';
 import {type User,type Shift,type Page,roles,stages,visibility,dateLabel,fullName} from './types';
+import Bank from './Bank';
 
 const message=(error:unknown)=>error instanceof Error?error.message:'Не удалось выполнить действие';
 function Notice({error,retry}:{error:unknown;retry?:()=>void}) {return <div className="notice error" role="alert"><strong>Не удалось выполнить действие</strong><p>{message(error)}</p>{retry&&<button className="secondary" onClick={retry}>Повторить</button>}</div>;}

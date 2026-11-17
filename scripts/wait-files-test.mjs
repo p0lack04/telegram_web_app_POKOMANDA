@@ -1,5 +1,6 @@
 import {createConnection} from 'node:net';
 import {setTimeout as delay} from 'node:timers/promises';
+import {S3Client,CreateBucketCommand,DeleteBucketPolicyCommand} from '@aws-sdk/client-s3';
 
 // Only the isolated compose test services; no environment-supplied production URL.
 function scannerReady(){return new Promise(resolve=>{
@@ -18,4 +19,9 @@ while(Date.now()<deadline){
  await delay(5000);
 }
 if(!ready)throw Error('Isolated S3/ClamAV test services did not become ready');
+const storage=new S3Client({endpoint:'http://127.0.0.1:19000',region:'us-east-1',forcePathStyle:true,credentials:{accessKeyId:'synthetic-test',secretAccessKey:'synthetic-test-only-password'}});
+try{
+ try{await storage.send(new CreateBucketCommand({Bucket:'komanda-test'}));}catch(error){if(error.name!=='BucketAlreadyOwnedByYou')throw error;}
+ await storage.send(new DeleteBucketPolicyCommand({Bucket:'komanda-test'}));
+}finally{storage.destroy();}
 console.info('Isolated S3/ClamAV test services are ready');

@@ -27,7 +27,7 @@ jobs:
       - run: npm run test:browser
   private-files-services:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,7 +37,6 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run generate
       - run: docker compose -f compose.files-test.yml up -d
-      - run: docker compose -f compose.files-test.yml wait bucket
       - run: node scripts/wait-files-test.mjs
       - run: npm test -w backend -- --run test/bank-files.integration.test.ts
         env:
