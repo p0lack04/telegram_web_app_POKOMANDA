@@ -1,4 +1,4 @@
-import {beforeAll,afterAll,describe,it,expect} from 'vitest';
+import {beforeAll,afterAll,beforeEach,describe,it,expect} from 'vitest';
 import {PrismaClient,type User} from '@prisma/client';
 import EmbeddedPostgres from 'embedded-postgres';
 import {mkdtemp} from 'node:fs/promises';
@@ -44,7 +44,7 @@ describe('squad read HTTP + PostgreSQL',()=>{
  const list=()=>`/api/shifts/${shift}/squads`;
  const detail=(id:string)=>`${list()}/${id}`;
  it('admin and view_all including combined permissions return exact DTO',async()=>{
-  for(const actor of [admin,all]) {const res=await get(actor,list());expect(res.statusCode).toBe(200);expect(res.json().total).toBe(4);expect(res.json().items.map((s:{id:string})=>s.id)).toEqual([a,b,c,d]);for(const squad of res.json().items)expect(Object.keys(squad).sort()).toEqual(['color','id','name','sortOrder']);const one=await get(actor,detail(c));expect(one.statusCode).toBe(200);expect(one.json()).toEqual({squad:res.json().items[2]});}
+  for(const actor of [admin,all]) {const res=await get(actor,list());expect(res.statusCode).toBe(200);expect(res.json().total).toBe(4);expect(res.json().items.map((s:{id:string})=>s.id)).toEqual([a,b,c,d]);for(const squad of res.json().items)expect(Object.keys(squad).sort()).toEqual(['color','id','name','sortOrder']);const one=await get(actor,detail(c));expect(one.statusCode).toBe(200);expect(one.json()).toEqual({squad:res.json().items[2],capabilities:{manage:actor.id===admin.id,editPayment:actor.id===admin.id,editCheckin:actor.id===admin.id}});}
  });
  it('own union of role and multiple memberships with filtered pagination',async()=>{
   const res=await get(own,`${list()}?page=2&pageSize=1`);expect(res.statusCode).toBe(200);expect(res.json()).toMatchObject({page:2,pageSize:1,total:3,items:[{id:b}]});
@@ -102,5 +102,117 @@ describe('child endpoints',()=>{
   const changed=await app.inject({method:'PATCH',url:`${url()}/${id}`,headers:{cookie:cookies.get(admin.id)!,origin},payload:{building:'A',room:'1',squadId:b}});
   expect(changed.statusCode).toBe(200);expect(changed.json().member.squadId).toBe(b);
   expect((await get(admin,`${url()}/${id}`)).statusCode).toBe(404);
+ });
+});
+
+describe('squad lifecycle and member fields acceptance',()=>{
+ beforeEach(async()=>{await app.close();app=await buildApp({NODE_ENV:'test',HOST:'127.0.0.1',PORT:3001,DATABASE_URL:'postgresql://test:test@localhost/test',APP_ORIGIN:origin,TELEGRAM_BOT_TOKEN:'123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk'},db);});
+ const request=(actor:User,method:'POST'|'PATCH'|'DELETE',url:string,payload:object={})=>app.inject({method,url,headers:{cookie:cookies.get(actor.id)!,origin},payload});
+ let serial=900;
+ async function setup(){
+  const s=await db.shift.create({data:{title:'Lifecycle synthetic',visibility:'ADMIN_LEAD_TRAINEE',startDate:new Date('2027-01-01'),endDate:new Date('2027-01-10')}});
+  const x=await db.squad.create({data:{shiftId:s.id,name:'Alpha'}});const y=await db.squad.create({data:{shiftId:s.id,name:'Beta'}});
+  const employee=await fixture(serial++,'LEAD');await db.application.create({data:{shiftId:s.id,userId:employee.id,type:'LEAD_RECRUIT',status:'APPROVED'}});
+  return {s,x,y,employee,base:`/api/shifts/${s.id}`};
+ }
+ it('creates edits and deletes an empty squad, validates hex colors, no-op audit',async()=>{
+  const f=await setup();const res=await request(admin,'POST',`${f.base}/squads`,{name:'New',color:'#123abc',sortOrder:2});expect(res.statusCode).toBe(201);const id=res.json().squad.id;
+  expect((await request(admin,'PATCH',`${f.base}/squads/${id}`,{name:'Renamed',color:'#456789',sortOrder:3})).statusCode).toBe(200);
+  expect((await request(admin,'PATCH',`${f.base}/squads/${id}`,{name:'Renamed',color:'#456789',sortOrder:3})).statusCode).toBe(200);
+  expect(await db.auditLog.count({where:{entityId:id}})).toBe(2);
+  expect((await request(admin,'POST',`${f.base}/squads`,{name:'Bad',color:'#gggggg'})).statusCode).toBe(400);
+  expect((await request(admin,'DELETE',`${f.base}/squads/${id}`)).statusCode).toBe(200);
+ });
+ it('name-only squad patch preserves sortOrder and empty patch is rejected',async()=>{
+  const f=await setup();await db.squad.update({where:{id:f.x.id},data:{sortOrder:7}});
+  const changed=await request(admin,'PATCH',`${f.base}/squads/${f.x.id}`,{name:'Only name'});expect(changed.statusCode).toBe(200);expect(changed.json().squad.sortOrder).toBe(7);
+  expect((await request(admin,'PATCH',`${f.base}/squads/${f.x.id}`,{})).statusCode).toBe(400);
+  expect(await db.auditLog.count({where:{entityId:f.x.id}})).toBe(1);
+ });
+ it('stale membership removal and competing moves cannot change another squad membership',async()=>{
+  const f=await setup();const member=(await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:f.employee.id,memberType:'LEAD'})).json().member;const path=`${f.base}/squad-members/${member.id}`;
+  const snapshot={expectedSquadId:f.x.id,updatedAt:member.updatedAt};
+  expect((await request(admin,'PATCH',path,{squadId:f.y.id,...snapshot})).statusCode).toBe(200);
+  expect((await request(admin,'DELETE',path,snapshot)).statusCode).toBe(409);
+  expect((await request(admin,'PATCH',path,{squadId:f.x.id,...snapshot})).statusCode).toBe(409);
+  expect(await db.squadMember.findUnique({where:{id:member.id}})).toMatchObject({squadId:f.y.id});
+  const current=await db.squadMember.findUniqueOrThrow({where:{id:member.id}});
+  const results=await Promise.all([request(admin,'PATCH',path,{squadId:f.x.id,expectedSquadId:f.y.id,updatedAt:current.updatedAt.toISOString()}),request(admin,'PATCH',path,{squadId:f.x.id,expectedSquadId:f.y.id,updatedAt:current.updatedAt.toISOString()})]);
+  expect(results.map(r=>r.statusCode).sort()).toEqual([200,409]);
+  expect(await db.auditLog.count({where:{entityId:member.id,action:'STAFF_MEMBER_REMOVED'}})).toBe(0);
+ });
+ it('approved candidates, repeated add, multiple memberships, minimal DTO and history survive removal',async()=>{
+  const f=await setup();const staff=`${f.base}/squads/${f.x.id}/staff`;
+  const candidates=await get(admin,`${f.base}/squads/${f.x.id}/staff-candidates?search=Test`);expect(candidates.statusCode).toBe(200);expect(candidates.json().items.map((x:{id:string})=>x.id)).toContain(f.employee.id);expect(candidates.body).not.toContain('telegramId');
+  const results=await Promise.all([request(admin,'POST',staff,{userId:f.employee.id,memberType:'LEAD'}),request(admin,'POST',staff,{userId:f.employee.id,memberType:'LEAD'})]);expect(results.map(r=>r.statusCode)).toEqual([201,201]);const id=results[0].json().member.id;expect(results[1].json().member.id).toBe(id);
+  expect(await db.auditLog.count({where:{entityId:id,action:'STAFF_MEMBER_ADDED'}})).toBe(1);
+  expect((await request(admin,'POST',`${f.base}/squads/${f.y.id}/staff`,{userId:f.employee.id,memberType:'LEAD'})).statusCode).toBe(201);
+  const list=await get(admin,staff);expect(list.json().items[0].memberships).toHaveLength(2);expect(list.body).not.toContain('birthDate');expect(list.body).not.toContain('phone');
+  expect((await request(admin,'DELETE',`${f.base}/squads/${f.x.id}`)).statusCode).toBe(409);
+  expect((await request(admin,'DELETE',`${f.base}/squad-members/${id}`)).statusCode).toBe(200);
+  const history=await get(admin,`${f.base}/squads/${f.x.id}/history`);expect(history.json().items.map((x:{action:string})=>x.action)).toContain('STAFF_MEMBER_REMOVED');expect(history.body).not.toContain('userId');
+ });
+ it('scope cannot be widened by view_all, direct IDs and cross-shift; inactive and admission denied',async()=>{
+  const f=await setup();await db.shiftRole.createMany({data:[{shiftId:f.s.id,userId:f.employee.id,position:'Ведущий отряда',squadId:f.x.id},{shiftId:f.s.id,userId:f.employee.id,position:'Ответственный за программу'}]});
+  expect((await get(f.employee,`${f.base}/squads/${f.y.id}`)).json().capabilities.manage).toBe(false);
+  expect((await request(f.employee,'PATCH',`${f.base}/squads/${f.y.id}`,{name:'Forbidden'})).statusCode).toBe(404);
+  expect((await request(f.employee,'POST',`${f.base}/squads/${f.y.id}/staff`,{userId:f.employee.id,memberType:'LEAD'})).statusCode).toBe(404);
+  expect((await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:pending.id,memberType:'TRAINEE'})).statusCode).toBe(409);
+  expect((await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:memberOnly.id,memberType:'TRAINEE'})).statusCode).toBe(409);
+  expect((await request(admin,'PATCH',`${f.base}/squads/${foreign}`,{name:'Forbidden'})).statusCode).toBe(404);
+  expect((await get(pending,`${f.base}/squads`)).statusCode).toBe(403);
+  expect((await get(memberOnly,`${f.base}/squads/${f.x.id}/staff`)).statusCode).toBe(404);
+ });
+ it('payment/checkin explicit fields, PARTIAL note, no-op, CAS and double permission',async()=>{
+  const f=await setup();const added=await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:f.employee.id,memberType:'LEAD'});const id=added.json().member.id;const path=`${f.base}/squad-members/${id}`;
+  for(const paymentNote of [undefined,'','   '])expect((await request(admin,'PATCH',path+'/payment',{paymentStatus:'PARTIAL',paymentNote})).statusCode).toBe(400);
+  const paid=await request(admin,'PATCH',path+'/payment',{paymentStatus:'PARTIAL',paymentNote:'Synthetic note'});expect(paid.statusCode).toBe(200);expect(paid.body).not.toContain('birthDate');
+  expect((await request(admin,'PATCH',path+'/payment',{paymentStatus:'PARTIAL',paymentNote:'Synthetic note'})).statusCode).toBe(200);expect(await db.auditLog.count({where:{entityId:id,action:'MEMBER_PAYMENT_UPDATED'}})).toBe(1);
+  const snapshot=paid.json().member.updatedAt;
+  const parallel=await Promise.all([request(admin,'PATCH',path+'/payment',{paymentStatus:'PAID',updatedAt:snapshot}),request(admin,'PATCH',path+'/payment',{paymentStatus:'UNPAID',updatedAt:snapshot})]);expect(parallel.map(r=>r.statusCode).sort()).toEqual([200,409]);
+  expect((await request(admin,'PATCH',path+'/checkin',{checkinStatus:true})).statusCode).toBe(200);expect((await request(admin,'PATCH',path+'/checkin',{checkinStatus:true})).statusCode).toBe(200);expect(await db.auditLog.count({where:{entityId:id,action:'MEMBER_CHECKIN_UPDATED'}})).toBe(1);
+  await db.shiftRole.create({data:{shiftId:f.s.id,userId:f.employee.id,position:'Ведущий отряда',squadId:f.x.id}});
+  expect((await request(f.employee,'PATCH',path+'/payment',{paymentStatus:'PAID'})).statusCode).toBe(403);expect((await request(f.employee,'PATCH',path+'/checkin',{checkinStatus:false})).statusCode).toBe(403);
+  expect((await get(f.employee,path+'/status')).json().capabilities).toMatchObject({editPayment:false,editCheckin:false});
+  expect((await request(admin,'PATCH',`/api/shifts/${otherShift}/squad-members/${id}/payment`,{paymentStatus:'PAID'})).statusCode).toBe(404);
+ });
+ it('daily date-only boundaries, uniqueness, CAS, no-op and dependency protection',async()=>{
+  const f=await setup();const member=(await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:f.employee.id,memberType:'LEAD'})).json().member;const path=`${f.base}/squad-members/${member.id}`;
+  for(const date of ['2027-02-29','2028-02-30','2027-01-01T00:00:00Z','2027-13-01'])expect((await request(admin,'POST',path+'/daily-marks',{date,markType:'FULL_DAY'})).statusCode).toBe(400);
+  const results=await Promise.all([request(admin,'POST',path+'/daily-marks',{date:'2028-02-29',markType:'FULL_DAY',updatedAt:null}),request(admin,'POST',path+'/daily-marks',{date:'2028-02-29',markType:'TECHNIC',updatedAt:null})]);expect(results.map(r=>r.statusCode).sort()).toEqual([201,409]);
+  const mark=results.find(r=>r.statusCode===201)!.json().mark;expect(mark.date).toBe('2028-02-29');
+  expect((await request(admin,'POST',path+'/daily-marks',{date:mark.date,markType:mark.markType,updatedAt:mark.updatedAt})).statusCode).toBe(201);expect(await db.auditLog.count({where:{entityId:mark.id}})).toBe(1);
+  for(const date of ['2027-12-31','2028-01-01'])expect((await request(admin,'POST',path+'/daily-marks',{date,markType:'TECHNIC',note:'Synthetic'})).statusCode).toBe(201);
+  expect((await get(admin,path+'/daily-marks?pageSize=1')).json()).toMatchObject({total:3,items:[{date:'2028-02-29'}]});
+  expect((await request(admin,'DELETE',path)).statusCode).toBe(409);expect(await db.squadMember.findUnique({where:{id:member.id}})).not.toBeNull();
+  expect((await get(memberOnly,path+'/daily-marks')).statusCode).toBe(404);
+ });
+ it('deputy can manage fields, limited viewers cannot; daily filter does not normalize invalid dates',async()=>{
+  const f=await setup();const member=(await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:f.employee.id,memberType:'LEAD'})).json().member;const path=`${f.base}/squad-members/${member.id}`;
+  await db.shiftRole.create({data:{shiftId:f.s.id,userId:f.employee.id,position:'Заместитель руководителя'}});
+  expect((await request(f.employee,'PATCH',path+'/payment',{paymentStatus:'PAID'})).statusCode).toBe(200);
+  expect((await request(f.employee,'PATCH',path+'/checkin',{checkinStatus:true})).statusCode).toBe(200);
+  expect((await request(f.employee,'POST',path+'/daily-marks',{date:'2027-01-01',markType:'FULL_DAY'})).statusCode).toBe(201);
+  expect((await get(f.employee,path+'/daily-marks?date=2027-01-01')).json().total).toBe(1);
+  expect((await get(f.employee,path+'/daily-marks?date=2027-01-02')).json().total).toBe(0);
+  expect((await get(f.employee,path+'/daily-marks?date=2027-02-29')).statusCode).toBe(400);
+  await db.shiftRole.deleteMany({where:{shiftId:f.s.id,userId:f.employee.id}});
+  await db.shiftRole.create({data:{shiftId:f.s.id,userId:f.employee.id,position:'Стажёр'}});
+  expect((await get(f.employee,path+'/daily-marks')).json().capabilities.edit).toBe(false);
+  expect((await request(f.employee,'POST',path+'/daily-marks',{date:'2027-01-01',markType:'TECHNIC'})).statusCode).toBe(403);
+  await db.user.update({where:{id:f.employee.id},data:{accountStatus:'REJECTED'}});
+  expect((await get(f.employee,path+'/status')).statusCode).toBe(403);
+  expect((await request(f.employee,'PATCH',path+'/checkin',{checkinStatus:false})).statusCode).toBe(403);
+ });
+ it('audit failure rolls payment, checkin and daily changes back',async()=>{
+  const f=await setup();const member=(await request(admin,'POST',`${f.base}/squads/${f.x.id}/staff`,{userId:f.employee.id,memberType:'LEAD'})).json().member;const path=`${f.base}/squad-members/${member.id}`;
+  await db.$executeRawUnsafe(`CREATE FUNCTION reject_squad_audit() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic audit failure'; END $$`);
+  await db.$executeRawUnsafe(`CREATE TRIGGER reject_squad_audit BEFORE INSERT ON "AuditLog" FOR EACH ROW EXECUTE FUNCTION reject_squad_audit()`);
+  try {
+   expect((await request(admin,'PATCH',path+'/payment',{paymentStatus:'PAID'})).statusCode).toBe(500);
+   expect((await request(admin,'PATCH',path+'/checkin',{checkinStatus:true})).statusCode).toBe(500);
+   expect((await request(admin,'POST',path+'/daily-marks',{date:'2027-01-01',markType:'FULL_DAY'})).statusCode).toBe(500);
+   expect(await db.squadMember.findUnique({where:{id:member.id}})).toMatchObject({paymentStatus:'UNPAID',checkinStatus:false});expect(await db.dailyMark.count({where:{squadMemberId:member.id}})).toBe(0);
+  } finally {await db.$executeRawUnsafe(`DROP TRIGGER reject_squad_audit ON "AuditLog"`);await db.$executeRawUnsafe(`DROP FUNCTION reject_squad_audit()`);}
  });
 });
