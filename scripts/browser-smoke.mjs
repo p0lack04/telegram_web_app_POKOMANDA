@@ -19,6 +19,17 @@ const listener=createServer();await new Promise(r=>listener.listen(0,'127.0.0.1'
 const directory=await mkdtemp(join(tmpdir(),'komanda-browser-'));
 const password=randomBytes(20).toString('hex');
 const pg=new EmbeddedPostgres({databaseDir:join(directory,'data'),user:'postgres',password,port,persistent:false,autoRehydrateSymlinks:true,postgresFlags:['-h','127.0.0.1'],onLog:()=>{},onError:()=>{}});
+// File UI acceptance uses explicit test adapters, not real S3 or ClamAV.
+// Real external-service acceptance is a separate test and must not be inferred here.
+const fileObjects=new Map();
+let fileScanResult='CLEAN';
+let fileScanGate;
+const testFiles={storage:{
+ async put(key,bytes){fileObjects.set(key,Buffer.from(bytes));},
+ async get(key){const bytes=fileObjects.get(key);if(!bytes)throw Error('Synthetic missing object');return Buffer.from(bytes);},
+ async remove(key){fileObjects.delete(key);},
+ async *keys(){yield* fileObjects.keys();},
+},scanner:{async scan(){if(fileScanGate)await fileScanGate;if(fileScanResult==='ERROR')throw Error('Synthetic scanner unavailable');return fileScanResult;}}};
 let db,app,vite,browser;
 try {
  await pg.initialise();await pg.start();await pg.createDatabase('komanda_browser');
@@ -27,7 +38,7 @@ try {
  db=new PrismaClient({datasources:{db:{url}}});
  vite=await createVite({root:resolve('frontend'),configFile:resolve('frontend/vite.config.ts'),server:{host:'127.0.0.1',port:0}});await vite.listen();
  const origin=`http://127.0.0.1:${vite.httpServer.address().port}`;
- app=await buildApp({NODE_ENV:'test',PORT:3001,HOST:'127.0.0.1',DATABASE_URL:url,APP_ORIGIN:origin,TELEGRAM_BOT_TOKEN:'123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk'},db);
+ app=await buildApp({NODE_ENV:'test',PORT:3001,HOST:'127.0.0.1',DATABASE_URL:url,APP_ORIGIN:origin,TELEGRAM_BOT_TOKEN:'123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk'},db,testFiles);
  await app.listen({host:'127.0.0.1',port:0});
  // Переопределение proxy до первого запроса, не подмена ответа API.
  vite.config.server.proxy['/api']=`http://127.0.0.1:${app.server.address().port}`;
@@ -75,7 +86,7 @@ try {
  await expect(admin.page.getByText('Решение сохранено.')).toBeVisible();
  await pending.page.getByRole('button',{name:'Проверить статус'}).click();
  await expect(pending.page.getByRole('heading',{name:'Главная',exact:true})).toBeVisible();
- const restartApi=async()=>{await Promise.all(browser.contexts().flatMap(context=>context.pages()).map(page=>page.waitForLoadState('networkidle')));const apiPort=app.server.address().port;await app.close();app=await buildApp({NODE_ENV:'test',PORT:3001,HOST:'127.0.0.1',DATABASE_URL:url,APP_ORIGIN:origin,TELEGRAM_BOT_TOKEN:'123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk'},db);await app.listen({host:'127.0.0.1',port:apiPort});};
+ const restartApi=async()=>{await Promise.all(browser.contexts().flatMap(context=>context.pages()).map(page=>page.waitForLoadState('networkidle')));const apiPort=app.server.address().port;await app.close();app=await buildApp({NODE_ENV:'test',PORT:3001,HOST:'127.0.0.1',DATABASE_URL:url,APP_ORIGIN:origin,TELEGRAM_BOT_TOKEN:'123456:ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijk'},db,testFiles);await app.listen({host:'127.0.0.1',port:apiPort});};
  // Независимые группы браузерных сценариев получают новый in-memory rate-limit store;
  // production лимит не отключается, PostgreSQL и сохранённые сессии остаются теми же.
  await restartApi();
@@ -548,12 +559,79 @@ try {
  await admin.page.emulateMedia({colorScheme:'light'});
  await admin.page.screenshot({path:'test-results/program-320-light.png',fullPage:true});
  await lead.page.screenshot({path:'test-results/program-mobile-dark.png',fullPage:true});
+ // Stage 4 files: real browser/HTTP/PostgreSQL with explicit fake I/O adapters.
+ // This verifies UI and authorization, not real S3/ClamAV connectivity or detection.
+ await restartApi();
+ await admin.page.getByRole('navigation').getByRole('button',{name:'Банк',exact:true}).click();
+ await admin.page.getByLabel('Новое мероприятие',{exact:true}).fill('Синтетические вложения');
+ await admin.page.getByRole('button',{name:'Добавить в банк',exact:true}).click();
+ const fileEventPanel=panel(admin.page,'Синтетические вложения');
+ await expect(fileEventPanel).toBeVisible();
+ const fileEvent=await db.bankEvent.findFirstOrThrow({where:{title:'Синтетические вложения'}});
+ await fileEventPanel.getByRole('button',{name:'Редактировать мероприятие банка',exact:true}).click();
+ await fileEventPanel.getByLabel('Описание материала банка').fill('Закрытый синтетический материал');
+ await fileEventPanel.getByLabel('Общий материал',{exact:true}).uncheck();
+ await fileEventPanel.getByRole('button',{name:'Сохранить материал банка',exact:true}).click();
+ await expect(fileEventPanel.getByText('Закрытый синтетический материал',{exact:true})).toBeVisible();
+ await expect.poll(async()=>(await db.bankEvent.findUniqueOrThrow({where:{id:fileEvent.id}})).isPublic).toBe(false);
+ expect((await trainee.context.request.get(`${origin}/api/bank-events/${fileEvent.id}`)).status()).toBe(404);
+ await fileEventPanel.getByRole('button',{name:'Вложения',exact:true}).click();
+ const attachments=admin.page.getByRole('region',{name:'Файлы мероприятия',exact:true});
+ const uploadSynthetic=async(name,bytes,mime='text/plain')=>{
+  await attachments.getByLabel('Выберите файл').setInputFiles({name,mimeType:mime,buffer:bytes});
+  await attachments.getByRole('button',{name:'Загрузить файл',exact:true}).click();
+ };
+ let releaseScan;
+ fileScanGate=new Promise(resolve=>{releaseScan=resolve;});
+ await uploadSynthetic('synthetic.txt',Buffer.from('Synthetic private attachment'));
+ try {
+  await expect(attachments.getByRole('button',{name:'Загрузка и проверка…',exact:true})).toBeDisabled();
+  await expect(attachments.getByRole('progressbar',{name:'Прогресс загрузки',exact:true})).toBeVisible();
+  await expect.poll(()=>db.bankEventFile.count({where:{bankEventId:fileEvent.id,scanStatus:'PENDING'}})).toBe(1);
+  const pendingFile=await db.bankEventFile.findFirstOrThrow({where:{bankEventId:fileEvent.id}});
+  expect((await admin.context.request.get(`${origin}/api/bank-events/${fileEvent.id}/files/${pendingFile.id}/download`)).status()).toBe(409);
+  await expect(attachments.getByRole('button',{name:'Скачать synthetic.txt',exact:true})).toHaveCount(0);
+ } finally {releaseScan();fileScanGate=undefined;}
+ await expect(attachments.getByText('Файл загружен и проверен.',{exact:true})).toBeVisible();
+ const downloadEvent=admin.page.waitForEvent('download');
+ await attachments.getByRole('button',{name:'Скачать synthetic.txt',exact:true}).click();
+ expect((await downloadEvent).suggestedFilename()).toBe('synthetic.txt');
+ const safeFile=await db.bankEventFile.findFirstOrThrow({where:{bankEventId:fileEvent.id,fileName:'synthetic.txt'}});
+ const safeResponse=await admin.context.request.get(`${origin}/api/bank-events/${fileEvent.id}/files/${safeFile.id}/download`);
+ expect(safeResponse.status()).toBe(200);expect((await safeResponse.body()).toString()).toBe('Synthetic private attachment');
+ fileScanResult='INFECTED';
+ await uploadSynthetic('rejected.txt',Buffer.from('Synthetic rejected fixture; scanner is a test double'));
+ await expect(attachments.getByText('Файл отклонён проверкой. Скачивание запрещено.',{exact:true})).toBeVisible();
+ await expect(attachments.getByRole('button',{name:'Скачать rejected.txt',exact:true})).toHaveCount(0);
+ fileScanResult='ERROR';
+ await uploadSynthetic('retry.txt',Buffer.from('Synthetic retry fixture'));
+ await expect(attachments.getByRole('button',{name:'Повторить проверку retry.txt',exact:true})).toBeVisible();
+ await expect(attachments.getByRole('button',{name:'Скачать retry.txt',exact:true})).toHaveCount(0);
+ fileScanResult='CLEAN';
+ await attachments.getByRole('button',{name:'Повторить проверку retry.txt',exact:true}).click();
+ await expect(attachments.getByRole('button',{name:'Скачать retry.txt',exact:true})).toBeVisible();
+ const pixel=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64');
+ await uploadSynthetic('pixel.png',pixel,'image/png');
+ await attachments.getByRole('button',{name:'Просмотр pixel.png',exact:true}).click();
+ await expect(attachments.getByRole('region',{name:'Предварительный просмотр',exact:true}).getByRole('img',{name:'pixel.png',exact:true})).toBeVisible();
+ await attachments.getByRole('button',{name:'Закрыть просмотр',exact:true}).click();
+ await attachments.getByRole('button',{name:'Удалить synthetic.txt',exact:true}).click();
+ await attachments.getByRole('button',{name:'Отмена удаления файла',exact:true}).click();
+ await expect(attachments.getByRole('button',{name:'Скачать synthetic.txt',exact:true})).toBeVisible();
+ await attachments.getByRole('button',{name:'Удалить synthetic.txt',exact:true}).click();
+ await attachments.getByRole('button',{name:'Подтвердить удаление файла',exact:true}).click();
+ await expect(attachments.getByRole('button',{name:'Скачать synthetic.txt',exact:true})).toHaveCount(0);
+ expect((await admin.context.request.get(`${origin}/api/bank-events/${fileEvent.id}/files/${safeFile.id}/download`)).status()).toBe(404);
+ expect(fileObjects.has(safeFile.storageKey)).toBe(false);
+ await admin.page.emulateMedia({colorScheme:'dark',reducedMotion:'reduce'});
+ await admin.page.screenshot({path:'test-results/bank-files-320-dark.png',fullPage:true});
+ expect(await admin.page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  const guest=await browser.newContext({viewport:{width:320,height:700}});const guestPage=await guest.newPage();
  await guestPage.goto(origin);await expect(guestPage.getByRole('heading',{name:/Хорошие смены/})).toBeVisible();
  await guestPage.screenshot({path:'test-results/guest-320.png',fullPage:true});
  for(const page of [admin.page,trainee.page,lead.page,pending.page,guestPage]) expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  expect(errors).toEqual([]);
- console.info('Browser smoke passed: foundation/staffing/children/XLSX regression; Stage 3B UI squad create/edit/delete, admission, multiple memberships, linked-role conflict/detach/move/remove/history; Stage 3V PARTIAL note, network failure/retry, checkin, daily date-only create/update/dependency protection; program/bank regression; real PostgreSQL, mobile/light/dark/reduced motion, no overflow/page errors.');
+ console.info('Browser smoke passed: foundation/staffing/children/XLSX regression; Stage 3B UI squad create/edit/delete, admission, multiple memberships, linked-role conflict/detach/move/remove/history; Stage 3V PARTIAL note, network failure/retry, checkin, daily date-only create/update/dependency protection; program/bank regression; private-file UI upload/pending/CLEAN/INFECTED/ERROR retry/download/preview/delete with explicit fake storage/scanner (real S3/ClamAV NOT tested); real PostgreSQL, mobile/light/dark/reduced motion, no overflow/page errors.');
 } catch(error) {
  if(browser) for(const [i,context] of browser.contexts().entries()) for(const page of context.pages()) {await page.screenshot({path:`test-results/failure-${i}.png`,fullPage:true}).catch(()=>{});console.error('Browser page',i,(await page.locator('body').innerText()).slice(-5000));}
  throw error;
