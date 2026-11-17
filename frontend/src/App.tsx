@@ -5,7 +5,6 @@ import {telegram,useTelegram} from './telegram';
 import Program from './Program';
 import Staffing,{OwnStaffing} from './Staffing';
 import {Squads,SquadDetail} from './Squads';
-import Bank from './Bank';
 import {type User,type Shift,type Page,roles,stages,visibility,dateLabel,fullName} from './types';
 
 const message=(error:unknown)=>error instanceof Error?error.message:'Не удалось выполнить действие';
