@@ -299,6 +299,9 @@ model BankEventFile {
  mimeType String
  fileSize Int
  scanStatus String @default("PENDING")
+ requestKey String? @unique
+ deletedAt DateTime?
+ storageDeletedAt DateTime?
  createdAt DateTime @default(now())
  bankEvent BankEvent @relation(fields:[bankEventId],references:[id],onDelete:Restrict)
  uploader User @relation(fields:[uploadedById],references:[id],onDelete:Restrict)
