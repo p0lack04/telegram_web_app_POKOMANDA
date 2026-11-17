@@ -153,3 +153,32 @@ NODE_ENV=development ADMIN_TELEGRAM_ID=<ваш_числовой_Telegram_ID> npm
 ### Staffing API: explicit squad detach
 
 Managers with `shift.manage_roles` can detach a role without deleting it using `PATCH /api/shifts/:id/roles/:roleId/squad` and body `{ "squadId": null }`. The operation preserves the position and its permissions. Moving or removing the last squad membership is rejected with HTTP 409 until the role is detached.
+
+## Приватные файлы банка (рабочая реализация этапа 4)
+
+API: `GET/POST /api/bank-events/:eventId/files`, `POST .../:fileId/scan`, `GET .../:fileId/download`, `DELETE .../:fileId`. Upload — multipart с одним полем `file` и UUID-заголовком `Idempotency-Key`; повтор загрузки тех же байтов с тем же ключом не создаёт вторую запись. Ошибка S3 возвращает 503, ошибка сканирования оставляет ERROR, доступ к скачиванию разрешён только CLEAN. Прогресс передачи 100% не означает окончание проверки. Сканы личных документов не добавляются.
+
+Документы: PDF/DOCX/XLSX/PPTX/TXT ≤20 МиБ; медиа JPG/PNG/GIF/MP4/MP3/WAV ≤50 МиБ. Проверяются имя, расширение, MIME, сигнатура содержимого (TXT — UTF-8), SHA-256 и ClamAV. Ключ объекта случайный, пользовательское имя не используется как путь. Объекты должны находиться в приватном bucket; API выдаёт байты после повторной авторизации, с attachment/no-store/nosniff. Превью ограничено проверенными изображениями/аудио/видео, SVG/HTML не поддерживаются.
+
+Настройка только backend env: S3_ENDPOINT, S3_REGION, S3_BUCKET, S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, CLAMAV_HOST, CLAMAV_PORT. Все основные параметры задаются вместе; без них API загрузки недоступен. Production S3 endpoint требует HTTPS. Bucket должен иметь запрет анонимного чтения; production конфигурация и реальные файлы этим заданием не затрагиваются.
+
+Изолированная тестовая среда (Docker требуется, в текущей среде отсутствует):
+
+```powershell
+docker compose -f compose.files-test.yml up -d
+# Дождитесь готовности ClamAV и создания private bucket; проверьте docker compose logs.
+$env:RUN_FILES_SERVICES='1'
+npm.cmd test -w backend -- --run test/bank-files.integration.test.ts
+Remove-Item Env:RUN_FILES_SERVICES
+```
+
+Opt-in тест использует только loopback MinIO `komanda-test` из compose, синтетические credentials и файлы; проверяет anonymous 403, CLEAN, безопасную EICAR-сигнатуру, запрет скачивания INFECTED, 50 МиБ INSTREAM, удаление и orphan cleanup. Без флага тест явно SKIP. Обычный HTTP/PostgreSQL suite и browser используют тестовые adapters и НЕ доказывают работу реального S3/ClamAV. Настройки CLAMD_CONF_* поддерживаются [официальным entrypoint ClamAV 1.4](https://github.com/Cisco-Talos/clamav-docker/blob/main/clamav/1.4/alpine/scripts/docker-entrypoint.sh); реальный запуск конфигурации ещё требует приёмки.
+
+После явного удаления запись помечается deletedAt и немедленно исчезает из выдачи; неуспех внешнего удаления оставляет cleanupPending. Операционная очистка повторяет удаление tombstones и удаляет объекты префикса bank/ без metadata:
+
+```powershell
+npm.cmd run build
+node --env-file=backend/.env backend/dist/cleanup-bank-files.js
+```
+
+Запускайте maintenance только с конфигурацией нужного изолированного окружения; для production требуется отдельный операционный запуск владельцем. TTL материалов не вводится. Незавершённые PENDING/ERROR можно повторно проверить через UI, при сбое PUT — повторить исходную загрузку с тем же ключом. Автоматическая очередь фоновых проверок не заявляется реализованной.

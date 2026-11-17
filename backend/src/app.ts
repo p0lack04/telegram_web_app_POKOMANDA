@@ -8,8 +8,9 @@ import { AppError, requireRule } from './errors.js';
 import type { Config } from './config.js';
 import { AuthService } from './services/auth.js';
 import { registerRoutes } from './routes/index.js';
+import {fileDependencies,type FileDependencies} from './integrations/bank-files.js';
 
-export async function buildApp(config:Config,db:PrismaClient) {
+export async function buildApp(config:Config,db:PrismaClient,files?:FileDependencies) {
  // HTTP request logging отключён: URL/headers/body могут содержать PII и секреты.
  const app=Fastify({logger:false,bodyLimit:32768,trustProxy:false});
  await app.register(cookie);
@@ -31,6 +32,6 @@ export async function buildApp(config:Config,db:PrismaClient) {
   return reply.code(status).send({error:{code:status===500?'INTERNAL_ERROR':'REQUEST_ERROR',message:status===500?'Не удалось выполнить запрос':'Запрос отклонён',requestId:request.id}});
  });
  app.setNotFoundHandler((request,reply)=>reply.code(404).send({error:{code:'NOT_FOUND',message:'Маршрут не найден',requestId:request.id}}));
- registerRoutes(app,db,new AuthService(db,config.TELEGRAM_BOT_TOKEN),config);
+ registerRoutes(app,db,new AuthService(db,config.TELEGRAM_BOT_TOKEN),config,files??fileDependencies(config));
  return app;
 }
