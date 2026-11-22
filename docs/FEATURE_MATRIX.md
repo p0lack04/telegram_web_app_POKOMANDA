@@ -1,5 +1,21 @@
 # Матрица функций — аудит 2026-11-15
 
+## Актуальный срез 3Б/3В/4 — 2026-11-22
+
+Эта сводка заменяет исторические статусы этих функций ниже. Рабочая реализация ещё не объединена; окончательная приёмка и ссылки на PR — в DEVELOPMENT_LOG.md.
+
+| Возможность | Реализовано в рабочей ветке | Проверки / ограничения |
+|---|---|---|
+| Squad CRUD | Создание, имя/цвет/порядок, список/detail, удаление только пустого | HTTP/PG; browser PASS |
+| Педсостав | APPROVED active candidates, добавление/перевод/снятие с подтверждением, multiple memberships/roles, переход к явной отвязке | Object/management scope, CAS stale intent, no-op, audit, negative tests |
+| Оплата / заезд | Явные формы детей/педсостава, PARTIAL note, boolean checkin, field rights, CAS | HTTP/PG concurrency/no-op/rollback; browser PASS |
+| DailyMark | Date-only list/filter/upsert, pagination, CAS, today по Shift.timeZone | UNIQUE/граничные даты/timezone/negative tests; без удаления |
+| Архивирование заполненных отрядов | Не добавляется | BLOCKED: бизнес-политика; зависимости запрещают удаление |
+| Банк / программа | Существующая реализация + исправление private list и PATCH defaults | Regression HTTP/PG; browser PASS |
+| Файлы банка | Multipart/progress, S3/ClamAV adapters, CLEAN-gated download, preview, delete, retry, tombstones/orphan cleanup | Unit/HTTP/PG с fake adapters; реальная MinIO/ClamAV приёмка PASS в CI, 13 tests, включая CLEAN/EICAR/50 MiB/download/delete/cleanup |
+
+Полный текущий набор: 173 backend и 66 frontend PASS, 1 opt-in real-service SKIP. Финальный browser smoke PASS на PostgreSQL; file I/O в browser — явно тестовые адаптеры. PR #12 (3Б/3В) открыт, Stage4 зависит от него. Реальные сервисы отдельно подтверждены: https://github.com/p0lack04/telegram_web_app_POKOMANDA/actions/runs/44071670113 . PR #13 зависит от #12; оба ожидают merge владельцем.
+
 Источники 1.txt, 2.txt и 3.txt прочитаны полностью. Статусы сверены с кодом; ограничения приёмки — в [аудите](audit/INITIAL-REPOSITORY-REVIEW.md).
 
 ## Этап 3 — Squad, дети и XLSX (D15–D21)
@@ -112,9 +128,3 @@ Backend-срезы Squad CRUD, членства, оплаты, заезда и D
 - PostgreSQL: ADMIN-only, повторный no-op без второго audit/notification, несколько должностей/членств, сохранение admission/global role/permissions, актуальный scope в той же сессии, изоляция смен, конкурентные detach/move и rollback всей транзакции при ошибке notification.
 - Browser flow назначает привязанную должность через UI, получает реальный 409 при переводе, отвязывает через UI и успешно переводит через API той же сессии. Формы перевода педсостава в текущем UI нет; весь Stage 3Б этим follow-up не закрывается. Stage 3В/4 не изменялись.
 - Подробные результаты команд — в DEVELOPMENT_LOG.md. Модели, миграции и утверждённые бизнес-правила не изменены.
-
-## 2026-11-17 — Stage 3Б / 3В: готово к приёмке в рабочей ветке
-
-Реализован UI/API/PostgreSQL цикл: CRUD пустых отрядов, кандидаты, несколько членств, перевод/подтверждённое снятие с CAS и переходом к отвязке должности; scoped history и capabilities. Оплата PARTIAL требует note, checkin сохраняет boolean; двойные полевые права, CAS/no-op/audit rollback. DailyMark list/filter/upsert использует date-only и существующий Shift.timeZone. Удаление зависимостей и автоматические связи не добавлялись. Архивирование заполненного отряда BLOCKED до бизнес-политики.
-
-Проверки полного рабочего дерева: generate/db:validate/lint/typecheck/build PASS; 173 backend + 66 frontend PASS, 1 real-file-service SKIP; browser smoke PASS на реальной PostgreSQL, mobile/light/dark/reduced motion, negative/network retry. Stage4 файлы оформляются отдельным зависимым PR; эти числа относятся совокупному дереву. PR #12: https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/12 . Merge не выполнен.

@@ -15,11 +15,14 @@
   "start": "node --env-file=.env dist/index.js"
  },
  "dependencies": {
+  "@aws-sdk/client-s3": "^3.1169.0",
   "@fastify/cookie": "^11.0.2",
   "@fastify/helmet": "^13.0.2",
+  "@fastify/multipart": "^10.1.8",
   "@fastify/rate-limit": "^10.3.0",
   "@prisma/client": "6.19.0",
   "fastify": "^5.6.2",
+  "file-type": "^22.3.0",
   "read-excel-file": "^9.3.15",
   "zod": "^4.6.7"
  },

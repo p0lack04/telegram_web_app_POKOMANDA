@@ -28,3 +28,9 @@ D1/D2/D3/D14/D12 утверждены владельцем 2026-11-13; см. ADR
 Аддитивные изменения отдельной миграцией. Application.version — optimistic concurrency для решений; история решений/назначений — AuditLog с subjectUserId в безопасных details. Новые индексы под собственные заявки/назначения и историю. Старые данные сохраняются, никаких TRUNCATE/reset/db push. Проверки: migrate deploy на чистую PostgreSQL + replay foundation→следующая миграция на данных foundation, сохранение строк и уникальности.
 
 Изменение заявки/роли, аудит и уведомление должны фиксироваться одной транзакцией. Блокировка Shift сериализует admission/assignment/recruitment mutations одной смены; перечитывать user/status/visibility в транзакции. Для параллельных решений использовать status/version CAS. Нарушение unique — 409, не 500. Foreign keys нельзя считать заменой application policies.
+
+## Приватные файлы — additive migration 202611160001_private_bank_files
+
+BankEventFile получает nullable requestKey с unique-индексом и nullable deletedAt/storageDeletedAt. Старые metadata сохраняются; scanStatus ограничен PENDING/CLEAN/INFECTED/ERROR через CHECK. Миграция не удаляет и не переписывает старые строки. До применения к постоянной БД: backup, проверка существующих scanStatus и обычный db:deploy; неверные legacy scanStatus остановят валидацию CHECK, автоматически менять их на CLEAN запрещено.
+
+Metadata создаётся транзакционно с аудитом до PUT. Внешний S3 не включается в DB transaction: при сбое объект остаётся недоступным, запись ERROR поддерживает повтор; tombstone обеспечивает логическое удаление до внешней очистки. Поздний PUT при конкурентном удалении не разрешает скачивание, cleanup удаляет объект. У материалов нет автоматического TTL. Поля Squad/DailyMark и их существующие UNIQUE/CHECK не менялись; updatedAt CAS использует существующее поле.

@@ -12,8 +12,10 @@ import { registerChildrenRoutes } from './children.js';
 import { registerChildrenImportRoutes } from './children-import.js';
 import { registerProgramBankRoutes } from './program-bank.js';
 import type { Config } from '../config.js';
+import {registerBankFileRoutes} from './bank-files.js';
+import type {FileDependencies} from '../integrations/bank-files.js';
 
-export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthService,config:Config) {
+export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthService,config:Config,files?:FileDependencies) {
  const cookieName=config.NODE_ENV==='production'?'__Host-komanda':'komanda_session';
  const cookieOptions={httpOnly:true,secure:config.NODE_ENV==='production',sameSite:'strict' as const,path:'/'};
  const userFor=(request:FastifyRequest)=>auth.authenticate(request.cookies[cookieName]);
@@ -24,6 +26,7 @@ export function registerRoutes(app:FastifyInstance, db:PrismaClient, auth:AuthSe
  registerChildrenRoutes(app,db,activeUser);
  registerChildrenImportRoutes(app,db,activeUser);
  registerProgramBankRoutes(app,db,activeUser);
+ registerBankFileRoutes(app,db,activeUser,files);
  const audit=(actor:User,action:string,entityType:string,entityId:string)=>({actorId:actor.id,action,entityType,entityId});
  app.get('/health',async()=>({status:'ok'}));
  app.post('/api/auth/telegram', {config:{rateLimit:{max:10,timeWindow:'1 minute'}}},async(request,reply)=>{
