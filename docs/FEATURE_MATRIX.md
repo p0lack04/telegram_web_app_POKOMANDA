@@ -1,6 +1,6 @@
 # Матрица функций — аудит 2026-11-15
 
-## Актуальный срез 3Б/3В/4 — 2026-11-17
+## Актуальный срез 3Б/3В/4 — 2026-11-22
 
 Эта сводка заменяет исторические статусы этих функций ниже. Рабочая реализация ещё не объединена; окончательная приёмка и ссылки на PR — в DEVELOPMENT_LOG.md.
 
@@ -12,9 +12,9 @@
 | DailyMark | Date-only list/filter/upsert, pagination, CAS, today по Shift.timeZone | UNIQUE/граничные даты/timezone/negative tests; без удаления |
 | Архивирование заполненных отрядов | Не добавляется | BLOCKED: бизнес-политика; зависимости запрещают удаление |
 | Банк / программа | Существующая реализация + исправление private list и PATCH defaults | Regression HTTP/PG; browser PASS |
-| Файлы банка | Multipart/progress, S3/ClamAV adapters, CLEAN-gated download, preview, delete, retry, tombstones/orphan cleanup | Unit/HTTP/PG с fake adapters; реальная S3/ClamAV приёмка BLOCKED локально, CI job подготовлен |
+| Файлы банка | Multipart/progress, S3/ClamAV adapters, CLEAN-gated download, preview, delete, retry, tombstones/orphan cleanup | Unit/HTTP/PG с fake adapters; реальная MinIO/ClamAV приёмка PASS в CI, 13 tests, включая CLEAN/EICAR/50 MiB/download/delete/cleanup |
 
-Полный текущий набор: 173 backend и 66 frontend PASS, 1 opt-in real-service SKIP. Финальный browser smoke PASS на PostgreSQL; file I/O в browser — явно тестовые адаптеры. PR #12 (3Б/3В) открыт, Stage4 зависит от него. Наличие реализации файлов не означает подтверждённую работу реальных сервисов.
+Полный текущий набор: 173 backend и 66 frontend PASS, 1 opt-in real-service SKIP. Финальный browser smoke PASS на PostgreSQL; file I/O в browser — явно тестовые адаптеры. PR #12 (3Б/3В) открыт, Stage4 зависит от него. Реальные сервисы отдельно подтверждены: https://github.com/p0lack04/telegram_web_app_POKOMANDA/actions/runs/44071670113 . PR #13 зависит от #12; оба ожидают merge владельцем.
 
 Источники 1.txt, 2.txt и 3.txt прочитаны полностью. Статусы сверены с кодом; ограничения приёмки — в [аудите](audit/INITIAL-REPOSITORY-REVIEW.md).
 

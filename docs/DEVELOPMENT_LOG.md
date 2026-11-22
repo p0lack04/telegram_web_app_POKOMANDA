@@ -152,3 +152,15 @@ Baseline: frontend tests PASS (40); lint/typecheck PASS; полный backend te
 - graphify update . PASS: нет новых изменений кода относительно предыдущего обновления графа; исторические предупреждения UTF-8/частичного AST сохраняются. При разделении коммитов PowerShell pipe испортил кодировку новой записи docs; исправлено отдельным коммитом dda7058 с явным UTF-8. Исторические байты сохранены.
 
 - CI PR #12 выявил оставшийся импорт следующего среза при разделении: исправлено 2fbf487, typecheck PASS. CI PR #13 не смог скачать прежний minio/minio: pull access denied. Тестовая инфраструктура переведена на сборку официального source release 2025-10-15; bucket создаёт существующий AWS SDK, публичная policy удаляется. PR #13: https://github.com/p0lack04/telegram_web_app_POKOMANDA/pull/13 . Реальная приёмка ожидает повторного CI.
+
+- Изолированный CI PR #12 PASS, включая browser: https://github.com/p0lack04/telegram_web_app_POKOMANDA/actions/runs/44071386686 . HEAD Stage3 2fbf4875cf6eccd5997d806df136a4608b6a13ac. Проверка объединяемости через read-only merge-tree не показала конфликтов; никакой merge не выполнялся.
+
+## 2026-11-22 — подтверждение приёмки 3Б/3В/4
+
+После паузы выполнен fetch: origin/main по-прежнему bab9e2987fbdc341420a5af2282f561966e28997. Изменения трёх этапов не объединены. PR #12 (2fbf487) CI PASS: https://github.com/p0lack04/telegram_web_app_POKOMANDA/actions/runs/44071386686 . PR #13 (2fa6251) оба job PASS: https://github.com/p0lack04/telegram_web_app_POKOMANDA/actions/runs/44071670113 .
+
+Сервисный job действительно запущен с RUN_FILES_SERVICES=1: 13 tests PASS, включая реальные приватные MinIO/ClamAV CLEAN, EICAR INFECTED, 50 MiB INSTREAM, anonymous 403, download/delete/orphan cleanup. Прежний инфраструктурный BLOCKED снят. Browser использует fake file adapters, но реальные сервисы проверены отдельным тестом, эти доказательства не смешиваются.
+
+Последняя UI-правка сокращает видимые подписи пагинации вложений на 320 px, сохраняя aria-label. Typecheck и 66 frontend tests PASS. Граф обновлён: 936 nodes/2242 edges; известные предупреждения исторической кодировки docs и частичного AST Staffing сохранены. Архивирование заполненных отрядов и новая политика удаления зависимых DailyMark остаются отдельными бизнес-вопросами. Следующий функциональный этап — 5, техзапросы и опросы.
+
+Финальный локальный прогон 2026-11-22 после UI-правки: lint PASS; npm.cmd run test:browser PASS (включает backend/frontend build); весь 3Б/3В/program/file UI workflow на PostgreSQL, mobile/light/dark/reduced motion и network retry, без overflow/page errors.
